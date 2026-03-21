@@ -12,7 +12,7 @@ function Features() {
     <section className="page-section info-page">
       <div className="section-heading compact">
         <div>
-          <p className="eyebrow">Why Students Love It</p>
+          <p className="eyebrow">Why this is cool for students.</p>
           <h2>Why this is cool for students.</h2>
         </div>
       </div>
@@ -20,7 +20,7 @@ function Features() {
       <div className="features-hero">
         <h3>Designed around student schedules, not kitchen queues.</h3>
         <p>
-          Canteen Ahead helps students spend less time waiting and more time learning, relaxing, and hanging out with friends.
+          Canteen Ahead helps students spend less time waiting and more time relaxing, and hanging out with friends.
           It is practical on busy days and still useful during quieter hours.
         </p>
       </div>

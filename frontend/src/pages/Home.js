@@ -1,14 +1,79 @@
-import { useEffect, useRef } from 'react';
+import axios from 'axios';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+
+const formatTimeLabel = (isoTime) => {
+  if (!isoTime) return '';
+  const date = new Date(isoTime);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+};
 
 function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const userName = localStorage.getItem('userName');
+  const userId = localStorage.getItem('userId');
+  const [orderInsight, setOrderInsight] = useState({
+    loading: false,
+    finalReadyTime: '',
+    pendingCount: 0,
+    message: ''
+  });
   const pageRef = useRef(null);
   const highlightRef = useRef(null);
   const aboutRef = useRef(null);
   const featuresRef = useRef(null);
+
+  const loadOrderInsight = async () => {
+    if (!userId) {
+      setOrderInsight({ loading: false, finalReadyTime: '', pendingCount: 0, message: '' });
+      return;
+    }
+
+    setOrderInsight((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await axios.get(`http://localhost:5000/api/orders/${userId}`);
+      const now = Date.now();
+      const orders = Array.isArray(res.data) ? res.data : [];
+
+      const pendingOrders = orders.filter((order) => {
+        const pickup = new Date(order.pickupTime).getTime();
+        if (Number.isNaN(pickup)) return false;
+
+        const statusKey = (order.status || '').toLowerCase();
+        const markedReady = statusKey.includes('ready') || statusKey.includes('complete') || statusKey.includes('done');
+        return pickup > now && !markedReady;
+      });
+
+      if (!pendingOrders.length) {
+        setOrderInsight({
+          loading: false,
+          finalReadyTime: '',
+          pendingCount: 0,
+          message: 'No active pending orders right now.'
+        });
+        return;
+      }
+
+      const finalReadyTs = Math.max(...pendingOrders.map((order) => new Date(order.pickupTime).getTime()));
+      const finalReadyTime = formatTimeLabel(finalReadyTs);
+
+      setOrderInsight({
+        loading: false,
+        finalReadyTime,
+        pendingCount: pendingOrders.length,
+        message: `All your current orders should be ready by ${finalReadyTime}.`
+      });
+    } catch (err) {
+      setOrderInsight({
+        loading: false,
+        finalReadyTime: '',
+        pendingCount: 0,
+        message: 'Unable to load your pickup summary at the moment.'
+      });
+    }
+  };
 
   const scrollToHighlights = () => {
     highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -72,6 +137,24 @@ function Home() {
     };
   }, [location.hash]);
 
+  useEffect(() => {
+    loadOrderInsight();
+
+    const timer = setInterval(() => {
+      loadOrderInsight();
+    }, 60000);
+
+    const sync = () => loadOrderInsight();
+    window.addEventListener('storage', sync);
+    window.addEventListener('user-auth-changed', sync);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('user-auth-changed', sync);
+    };
+  }, [userId]);
+
   return (
     <section className="page-section public-home" ref={pageRef}>
       <div className="public-home-hero" data-home-section="home" id="home">
@@ -85,10 +168,29 @@ function Home() {
 
         <div className="home-actions">
           <button className="primary-btn" onClick={() => navigate('/menu')}>Order Now</button>
-          <button className="ghost-btn" onClick={() => navigate('/login')}>
-            {userName ? 'Switch Account' : 'Login / Register'}
-          </button>
+          {userId ? (
+            <button className="ghost-btn" onClick={() => navigate('/orders')}>View Orders</button>
+          ) : (
+            <button className="ghost-btn" onClick={() => navigate('/login')}>
+              {userName ? 'Switch Account' : 'Login / Register'}
+            </button>
+          )}
         </div>
+
+        {userId && (
+          <div className="home-order-insight">
+            <p className="order-insight-title">Pickup Summary</p>
+            <p className="order-insight-message">
+              {orderInsight.loading ? 'Checking your latest order timeline...' : orderInsight.message}
+            </p>
+            {!orderInsight.loading && orderInsight.finalReadyTime && (
+              <p className="order-insight-time">Final ready time: {orderInsight.finalReadyTime}</p>
+            )}
+            {!orderInsight.loading && orderInsight.pendingCount > 0 && (
+              <p className="order-insight-count">Active pending orders: {orderInsight.pendingCount}</p>
+            )}
+          </div>
+        )}
 
         <button className="scroll-cue" onClick={scrollToHighlights} aria-label="Scroll down">
           <span>Scroll Down</span>
@@ -125,6 +227,12 @@ function Home() {
             <p className="eyebrow">About The Platform</p>
             <h2>How this works in 3 steps.</h2>
           </div>
+        </div>
+
+        <div className="about-visuals-row">
+          <img src="https://cdn-icons-png.flaticon.com/512/3075/3075977.png" alt="Order food" className="about-img" />
+          <img src="https://cdn-icons-png.flaticon.com/512/3075/3075979.png" alt="Wait for prep" className="about-img" />
+          <img src="https://cdn-icons-png.flaticon.com/512/3075/3075975.png" alt="Pickup meal" className="about-img" />
         </div>
 
         <div className="steps-grid">
@@ -171,6 +279,12 @@ function Home() {
           </div>
         </div>
 
+        <div className="features-visuals-row">
+          <img src="https://cdn-icons-png.flaticon.com/512/3075/3075972.png" alt="Save time" className="features-img" />
+          <img src="https://cdn-icons-png.flaticon.com/512/3075/3075973.png" alt="No queues" className="features-img" />
+          <img src="https://cdn-icons-png.flaticon.com/512/3075/3075974.png" alt="Order anywhere" className="features-img" />
+        </div>
+
         <div className="features-hero reveal-up">
           <h3>Designed around student schedules, not kitchen queues.</h3>
           <p>
@@ -210,6 +324,34 @@ function Home() {
           <button className="ghost-btn" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Back To Top</button>
         </div>
       </section>
+      <footer className="main-footer">
+        <div className="footer-content">
+          <div className="footer-col">
+            <div className="footer-logo">Canteen Ahead</div>
+            <div className="footer-desc">Smart pre-ordering for campus canteens. Save time, skip queues, and enjoy your break!</div>
+          </div>
+          <div className="footer-col" style={{alignItems: 'center'}}>
+            <div className="footer-contact">
+              <span>Contact: <a href="mailto:help@canteenahead.com" className="footer-link">help@canteenahead.com</a></span>
+            </div>
+            <div className="footer-social">
+              <a href="https://instagram.com/" className="footer-social-link" target="_blank" rel="noopener noreferrer" aria-label="Instagram">📸</a>
+              <a href="https://twitter.com/" className="footer-social-link" target="_blank" rel="noopener noreferrer" aria-label="Twitter">🐦</a>
+              <a href="https://facebook.com/" className="footer-social-link" target="_blank" rel="noopener noreferrer" aria-label="Facebook">📘</a>
+            </div>
+            <div className="footer-meta" style={{marginTop: '18px'}}>
+              <span>&copy; {new Date().getFullYear()} Canteen Ahead</span>
+              <span>Made for campus convenience</span>
+            </div>
+          </div>
+          <div className="footer-col">
+            <div className="footer-quick-info">
+              <span>Location: Main Campus, Food Court</span>
+              <span>Hours: 8:00am – 6:00pm</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </section>
   );
 }

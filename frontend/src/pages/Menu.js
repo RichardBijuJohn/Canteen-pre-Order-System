@@ -23,11 +23,24 @@ const computePickupSlot = (minutes = 15) => {
   };
 };
 
+const WORKING_HOURS = {
+  startMinutes: 8 * 60, // 8:00 AM
+  endMinutes: 22 * 60 // 10:00 PM
+};
+
+const WORKING_HOURS_LABEL = '8:00 AM - 10:00 PM';
+
+const isWithinWorkingHours = () => {
+  const now = new Date();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return minutes >= WORKING_HOURS.startMinutes && minutes < WORKING_HOURS.endMinutes;
+};
+
 function Menu() {
   const [menu, setMenu] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [banner, setBanner] = useState(null);
+  const [toast, setToast] = useState(null); // floating toast
   const [placingId, setPlacingId] = useState('');
   const [quantities, setQuantities] = useState({});
   const userId = localStorage.getItem('userId');
@@ -42,10 +55,18 @@ function Menu() {
       .finally(() => setLoading(false));
   };
 
+  // Toast auto-dismiss
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3200);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
   useEffect(() => {
     if (!userId) {
       setLoading(false);
-      setBanner({ type: 'error', message: 'Sign in to browse the menu and schedule pickups.' });
+      setToast({ type: 'error', message: 'Sign in to browse the menu and schedule pickups.' });
       navigate('/login', { replace: true });
       return;
     }
@@ -60,13 +81,18 @@ function Menu() {
 
   const placeOrder = async (item) => {
     if (!userId) {
-      setBanner({ type: 'error', message: 'Please log in before placing an order.' });
+      setToast({ type: 'error', message: 'Please log in before placing an order.' });
       navigate('/login', { replace: true });
       return;
     }
 
+    if (!isWithinWorkingHours()) {
+      setToast({ type: 'error', message: `Orders are open only between ${WORKING_HOURS_LABEL} (college hours).` });
+      return;
+    }
+
     setPlacingId(item._id);
-    setBanner(null);
+    setToast(null);
     const quantity = quantities[item._id] || 1;
     const unitPrice = Number(item.price) || 0;
     const totalAmount = unitPrice * quantity;
@@ -81,14 +107,16 @@ function Menu() {
         pickupTime: pickupSlot.iso
       });
 
-      setBanner({ type: 'success', message: `${item.name} scheduled for ${pickupSlot.label}.` });
+      setToast({ type: 'success', message: `${item.name} scheduled for ${pickupSlot.label}.` });
     } catch (err) {
       console.log(err);
       if (err.response?.status === 401) {
-        setBanner({ type: 'error', message: 'Session expired. Sign in again to continue.' });
+        setToast({ type: 'error', message: 'Session expired. Sign in again to continue.' });
         navigate('/login', { replace: true });
+      } else if (err.response?.status === 403) {
+        setToast({ type: 'error', message: err.response?.data?.msg || `Orders are open only between ${WORKING_HOURS_LABEL} (college hours).` });
       } else {
-        setBanner({ type: 'error', message: 'Order could not be created. Try again.' });
+        setToast({ type: 'error', message: 'Order could not be created. Try again.' });
       }
     } finally {
       setPlacingId('');
@@ -105,10 +133,9 @@ function Menu() {
         <button className="ghost-btn" onClick={fetchMenu} disabled={loading}>Refresh</button>
       </div>
 
-      {banner && (
-        <div className={`inline-banner ${banner.type}`}>
-          {banner.message}
-        </div>
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className={`floating-toast ${toast.type}`}>{toast.message}</div>
       )}
 
       {loading && (
@@ -159,11 +186,11 @@ function Menu() {
                       onChange={(e) => handleQuantityChange(item._id, e.target.value)}
                     />
                   </label>
-                  <div className="quantity-total">₹{displayTotal}</div>
+                  <div className="quantity-total">	{displayTotal}</div>
                 </div>
 
                 <div className="menu-meta">
-                  <span className="menu-price">₹{item.price}</span>
+                  <span className="menu-price">	{item.price}</span>
                   <button
                     className="primary-btn"
                     onClick={() => placeOrder(item)}
