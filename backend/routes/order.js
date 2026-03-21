@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 
+const WORKING_HOURS = {
+    startMinutes: 8 * 60, // 8:00 AM
+    endMinutes: 22 * 60 // 10:00 PM
+};
+
+const WORKING_HOURS_LABEL = '8:00 AM - 10:00 PM';
+
+const isWithinWorkingHours = () => {
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    return minutes >= WORKING_HOURS.startMinutes && minutes < WORKING_HOURS.endMinutes;
+};
+
 const parsePrepMinutes = (value) => {
     if (typeof value === 'number' && !Number.isNaN(value)) {
         return value;
@@ -26,6 +39,10 @@ router.post('/place', async (req, res) => {
 
     if (!userId) {
         return res.status(401).json({ msg: 'Login required to place orders.' });
+    }
+
+    if (!isWithinWorkingHours()) {
+        return res.status(403).json({ msg: `Orders can only be placed between ${WORKING_HOURS_LABEL} (college hours).` });
     }
 
     try {
