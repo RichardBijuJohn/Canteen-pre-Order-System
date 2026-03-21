@@ -13,6 +13,14 @@ const formatPickupTime = (value) => {
   return value;
 };
 
+const computeOrderState = (order, nowMs) => {
+  const pickupMs = new Date(order.pickupTime).getTime();
+  const statusKey = (order.status || '').toLowerCase();
+  const explicitDone = statusKey.includes('ready') || statusKey.includes('complete') || statusKey.includes('done');
+  const doneByTime = !Number.isNaN(pickupMs) && pickupMs <= nowMs;
+  return explicitDone || doneByTime ? 'done' : 'pending';
+};
+
 function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +76,17 @@ function Orders() {
   };
 
   const totalSpent = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+  const normalizedOrders = [...orders].sort((a, b) => {
+    const aMs = new Date(a.pickupTime).getTime();
+    const bMs = new Date(b.pickupTime).getTime();
+    const safeA = Number.isNaN(aMs) ? 0 : aMs;
+    const safeB = Number.isNaN(bMs) ? 0 : bMs;
+    return safeA - safeB;
+  });
+  const pendingCount = normalizedOrders.filter((order) => computeOrderState(order, now) === 'pending').length;
+  const readyCount = normalizedOrders.length - pendingCount;
+  const nextPickupOrder = normalizedOrders.find((order) => computeOrderState(order, now) === 'pending');
+  const nextPickupLabel = nextPickupOrder ? formatPickupTime(nextPickupOrder.pickupTime) : 'No pending pickups';
 
   return (
     <section className="page-section">
@@ -80,14 +99,22 @@ function Orders() {
       </div>
 
       {userId && !loading && !error && orders.length > 0 && (
-        <div className="order-summary">
-          <div>
+        <div className="order-kpi-grid">
+          <div className="order-kpi-card">
             <p className="order-label">Total amount</p>
             <p className="order-summary-value">₹{totalSpent.toFixed(2)}</p>
           </div>
-          <div>
-            <p className="order-label">Total orders</p>
-            <p className="order-summary-value">{orders.length}</p>
+          <div className="order-kpi-card">
+            <p className="order-label">Pending now</p>
+            <p className="order-summary-value">{pendingCount}</p>
+          </div>
+          <div className="order-kpi-card">
+            <p className="order-label">Ready now</p>
+            <p className="order-summary-value">{readyCount}</p>
+          </div>
+          <div className="order-kpi-card">
+            <p className="order-label">Next pickup</p>
+            <p className="order-summary-value order-summary-small">{nextPickupLabel}</p>
           </div>
         </div>
       )}
@@ -113,19 +140,22 @@ function Orders() {
 
       {userId && !loading && !error && orders.length > 0 && (
         <div className="card-grid orders-grid">
-          {orders.map((order, index) => {
+          {normalizedOrders.map((order, index) => {
             const shortId = order._id ? order._id.slice(-5) : '00000';
             const itemCount = order.items && order.items.length
               ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
               : 1;
 
-            const isReady = (order.status || '').toLowerCase().includes('ready');
+            const isReady = computeOrderState(order, now) === 'done';
             const pickupLabel = formatPickupTime(order.pickupTime);
             return (
               <article key={order._id || `order-${index}`} className={`order-card${isReady ? ' ready-pulse' : ''}`}>
                 <div className="order-header">
-                  <p className="order-id">Order #{shortId}</p>
-                  <span className={`status-chip ${statusTone(order.status)}`}>{order.status}</span>
+                  <div>
+                    <p className="order-id">Order #{shortId}</p>
+                    <p className="order-time-hint">Placed for {pickupLabel}</p>
+                  </div>
+                  <span className={`status-chip ${isReady ? 'ready' : statusTone(order.status)}`}>{isReady ? 'Done' : (order.status || 'Pending')}</span>
                   {isReady && (
                     <span className="ready-badge">Ready for Pickup!</span>
                   )}
