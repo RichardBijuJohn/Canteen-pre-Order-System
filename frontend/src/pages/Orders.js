@@ -18,6 +18,7 @@ function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [readyNotice, setReadyNotice] = useState('');
+  const [now, setNow] = useState(Date.now());
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
 
@@ -48,6 +49,12 @@ function Orders() {
     }
     fetchOrders(userId);
   }, [userId, navigate]);
+
+  // Real-time status update every 30s
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSync = () => fetchOrders(userId);
 
@@ -136,21 +143,37 @@ function Orders() {
                 </div>
                 {order.items && order.items.length > 0 && (
                   <ul className="order-items">
-                    {order.items.map((item, idx) => {
-                      const quantity = item.quantity || 1;
-                      const lineTotal = ((item.price || 0) * quantity).toFixed(2);
-                      const itemStatus = (item.status || 'Pending').toLowerCase();
-                      const done = itemStatus === 'done';
-                      return (
-                        <li key={`${order._id || 'order'}-${idx}`}>
-                          <div className="order-item-main">
-                            <span>{item.name || 'Item'}</span>
-                            <span className={`item-chip ${done ? 'done' : 'pending'}`}>{done ? 'Done' : 'Pending'}</span>
-                          </div>
-                          <span className="order-item-meta">× {quantity} · ₹{lineTotal}</span>
-                        </li>
-                      );
-                    })}
+                    {(() => {
+                      // Compute if pickup time is reached for this order (reactive to now)
+                      const pickupDate = new Date(order.pickupTime);
+                      const isDone = pickupDate <= new Date(now);
+                      let pendingShown = false;
+                      return order.items.map((item, idx) => {
+                        const quantity = item.quantity || 1;
+                        const lineTotal = ((item.price || 0) * quantity).toFixed(2);
+                        let itemStatus = (item.status || 'Pending').toLowerCase();
+                        // If pickup time is reached, mark as done visually
+                        if (isDone) itemStatus = 'done';
+                        const done = itemStatus === 'done';
+                        // Only show one Pending chip per order
+                        let chip = null;
+                        if (done) {
+                          chip = <span className="item-chip done">Done</span>;
+                        } else if (!pendingShown) {
+                          chip = <span className="item-chip pending">Pending</span>;
+                          pendingShown = true;
+                        }
+                        return (
+                          <li key={`${order._id || 'order'}-${idx}`}>
+                            <div className="order-item-main">
+                              <span>{item.name || 'Item'}</span>
+                              {chip}
+                            </div>
+                            <span className="order-item-meta">× {quantity} · ₹{lineTotal}</span>
+                          </li>
+                        );
+                      });
+                    })()}
                   </ul>
                 )}
               </article>

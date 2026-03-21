@@ -6,8 +6,18 @@ function Navbar() {
   const [userName, setUserName] = useState(localStorage.getItem('userName'));
   const [userId, setUserId] = useState(localStorage.getItem('userId'));
   const [landingSection, setLandingSection] = useState('home');
+  const [navBanner, setNavBanner] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
+  const handleProtectedNav = (e, route) => {
+    if (!userId) {
+      e.preventDefault();
+      setNavBanner(route === '/menu' ? 'Login to view the menu.' : 'Login to view your orders.');
+      setTimeout(() => setNavBanner(''), 2200);
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     const syncUser = () => {
@@ -74,9 +84,13 @@ function Navbar() {
         <Link to="/#about" className={`nav-link${location.pathname === '/' && landingSection === 'about' ? ' active' : ''}`}>About</Link>
         <Link to="/#features" className={`nav-link${location.pathname === '/' && landingSection === 'features' ? ' active' : ''}`}>Features</Link>
         <NavLink to="/login" className={navLinkClass}>Login</NavLink>
-        <NavLink to="/menu" className={navLinkClass}>Menu</NavLink>
-        <NavLink to="/orders" className={navLinkClass}>Orders</NavLink>
+        <NavLink to="/menu" className={navLinkClass} onClick={e => handleProtectedNav(e, '/menu')}>Menu</NavLink>
+        <NavLink to="/orders" className={navLinkClass} onClick={e => handleProtectedNav(e, '/orders')}>Orders</NavLink>
       </nav>
+
+      {navBanner && (
+        <div className="inline-banner error" style={{ position: 'absolute', top: 70, left: 0, right: 0, zIndex: 99, maxWidth: 420, margin: '0 auto' }}>{navBanner}</div>
+      )}
       {isAuthed && (
         <div className="nav-user">
           <span>Hi, {userName || 'Guest'}</span>
