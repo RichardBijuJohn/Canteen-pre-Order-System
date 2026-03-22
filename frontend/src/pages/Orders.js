@@ -16,6 +16,8 @@ const formatPickupTime = (value) => {
 const computeOrderState = (order, nowMs) => {
   const pickupMs = new Date(order.pickupTime).getTime();
   const statusKey = (order.status || '').toLowerCase();
+  if (statusKey.includes('picked')) return 'picked';
+  if (statusKey.includes('cancel')) return 'cancelled';
   const explicitDone = statusKey.includes('ready') || statusKey.includes('complete') || statusKey.includes('done');
   const doneByTime = !Number.isNaN(pickupMs) && pickupMs <= nowMs;
   return explicitDone || doneByTime ? 'done' : 'pending';
@@ -25,7 +27,6 @@ function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [readyNotice, setReadyNotice] = useState('');
   const [now, setNow] = useState(Date.now());
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
@@ -37,14 +38,6 @@ function Orders() {
     axios.get(`http://localhost:5000/api/orders/${id}`)
       .then(res => {
         setOrders(res.data);
-        const readyOrder = res.data.find(order => (order.status || '').toLowerCase().includes('ready'));
-        if (readyOrder) {
-          const shortId = readyOrder._id ? readyOrder._id.slice(-5) : '00000';
-          const pickupLabel = formatPickupTime(readyOrder.pickupTime);
-          setReadyNotice(`Order #${shortId} is ready for pickup at ${pickupLabel}.`);
-        } else {
-          setReadyNotice('');
-        }
       })
       .catch(() => setError('We cannot reach your recent orders.'))
       .finally(() => setLoading(false));
@@ -71,6 +64,7 @@ function Orders() {
     if (key.includes('pending')) return 'pending';
     if (key.includes('complete')) return 'complete';
     if (key.includes('ready')) return 'ready';
+    if (key.includes('picked')) return 'picked';
     if (key.includes('cancel')) return 'cancelled';
     return 'default';
   };
@@ -119,10 +113,6 @@ function Orders() {
         </div>
       )}
 
-      {readyNotice && (
-        <div className="inline-banner success">{readyNotice}</div>
-      )}
-
       {!userId && (
         <div className="inline-banner error">Sign in to review your previous orders.</div>
       )}
@@ -146,7 +136,9 @@ function Orders() {
               ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
               : 1;
 
-            const isReady = computeOrderState(order, now) === 'done';
+            const orderState = computeOrderState(order, now);
+            const isPicked = orderState === 'picked';
+            const isReady = orderState === 'done';
             const pickupLabel = formatPickupTime(order.pickupTime);
             return (
               <article key={order._id || `order-${index}`} className={`order-card${isReady ? ' ready-pulse' : ''}`}>
@@ -155,8 +147,10 @@ function Orders() {
                     <p className="order-id">Order #{shortId}</p>
                     <p className="order-time-hint">Placed for {pickupLabel}</p>
                   </div>
-                  <span className={`status-chip ${isReady ? 'ready' : statusTone(order.status)}`}>{isReady ? 'Done' : (order.status || 'Pending')}</span>
-                  {isReady && (
+                  <span className={`status-chip ${isPicked ? 'picked' : (isReady ? 'ready' : statusTone(order.status))}`}>
+                    {isPicked ? 'Picked' : (isReady ? 'Done' : (order.status || 'Pending'))}
+                  </span>
+                  {isReady && !isPicked && (
                     <span className="ready-badge">Ready for Pickup!</span>
                   )}
                 </div>
@@ -164,13 +158,14 @@ function Orders() {
                 <div className="order-meta">
                   <div>
                     <p className="order-label">Pickup time</p>
-                    <p>{isReady ? pickupLabel : `ETA ${pickupLabel}`}</p>
+                    <p>{(isReady || isPicked) ? pickupLabel : `ETA ${pickupLabel}`}</p>
                   </div>
                   <div>
                     <p className="order-label">Items</p>
                     <p>{itemCount}</p>
                   </div>
                 </div>
+
                 {order.items && order.items.length > 0 && (
                   <ul className="order-items">
                     {(() => {
