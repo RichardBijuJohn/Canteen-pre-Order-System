@@ -99,6 +99,11 @@ router.get('/:userId', async (req, res) => {
             const pickupDate = new Date(order.pickupTime);
             if (Number.isNaN(pickupDate.getTime())) return;
 
+            const statusKey = (order.status || '').toLowerCase();
+            if (statusKey.includes('picked') || statusKey.includes('cancel')) {
+                return;
+            }
+
             const readyByTime = pickupDate <= new Date();
             const hasPendingItems = (order.items || []).some(item => (item.status || 'Pending') !== 'Done');
             if (readyByTime && (order.status !== 'Ready for Pickup' || hasPendingItems)) {

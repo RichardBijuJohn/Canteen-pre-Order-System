@@ -37,6 +37,7 @@ function Admin() {
   const [menuSavingId, setMenuSavingId] = useState('');
   const [statusSavingId, setStatusSavingId] = useState('');
   const [loadingData, setLoadingData] = useState(false);
+  const [orderFilter, setOrderFilter] = useState('all');
 
   const headers = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token]);
 
@@ -100,6 +101,32 @@ function Admin() {
   useEffect(() => {
     loadAllData();
   }, [token]);
+
+  const orderMetrics = useMemo(() => {
+    const base = {
+      totalOrders: orders.length,
+      pending: 0,
+      ready: 0,
+      picked: 0,
+      revenue: 0,
+      menuCount: menuItems.length
+    };
+
+    orders.forEach((order) => {
+      const key = String(order.status || '').toLowerCase();
+      if (key.includes('pending')) base.pending += 1;
+      if (key.includes('ready')) base.ready += 1;
+      if (key.includes('picked')) base.picked += 1;
+      base.revenue += Number(order.totalAmount) || 0;
+    });
+
+    return base;
+  }, [orders, menuItems.length]);
+
+  const filteredOrders = useMemo(() => {
+    if (orderFilter === 'all') return orders;
+    return orders.filter((order) => String(order.status || '').toLowerCase().includes(orderFilter));
+  }, [orders, orderFilter]);
 
   const addMenuItem = async (e) => {
     e.preventDefault();
@@ -200,6 +227,33 @@ function Admin() {
         <div className={`inline-banner ${banner.type === 'error' ? 'error' : 'success'}`}>{banner.message}</div>
       )}
 
+      <section className="admin-overview-grid">
+        <article className="admin-overview-card">
+          <p className="order-label">Menu Items</p>
+          <p className="order-summary-value">{orderMetrics.menuCount}</p>
+        </article>
+        <article className="admin-overview-card">
+          <p className="order-label">Total Orders</p>
+          <p className="order-summary-value">{orderMetrics.totalOrders}</p>
+        </article>
+        <article className="admin-overview-card">
+          <p className="order-label">Pending</p>
+          <p className="order-summary-value">{orderMetrics.pending}</p>
+        </article>
+        <article className="admin-overview-card">
+          <p className="order-label">Ready</p>
+          <p className="order-summary-value">{orderMetrics.ready}</p>
+        </article>
+        <article className="admin-overview-card">
+          <p className="order-label">Picked</p>
+          <p className="order-summary-value">{orderMetrics.picked}</p>
+        </article>
+        <article className="admin-overview-card">
+          <p className="order-label">Revenue</p>
+          <p className="order-summary-value">Rs {orderMetrics.revenue.toFixed(2)}</p>
+        </article>
+      </section>
+
       <div className="admin-grid">
         <section className="admin-card">
           <h3>Add Menu Item</h3>
@@ -247,9 +301,17 @@ function Admin() {
       </div>
 
       <section className="admin-card admin-orders-card">
-        <h3>User Orders</h3>
+        <div className="admin-orders-head">
+          <h3>User Orders</h3>
+          <div className="admin-filter-tabs">
+            <button className={`ghost-btn${orderFilter === 'all' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('all')} type="button">All</button>
+            <button className={`ghost-btn${orderFilter === 'pending' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('pending')} type="button">Pending</button>
+            <button className={`ghost-btn${orderFilter === 'ready' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('ready')} type="button">Ready</button>
+            <button className={`ghost-btn${orderFilter === 'picked' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('picked')} type="button">Picked</button>
+          </div>
+        </div>
         <div className="admin-list">
-          {orders.map((order) => {
+          {filteredOrders.map((order) => {
             const itemCount = order.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
             return (
               <article key={order._id} className="admin-list-item order-admin-item">
@@ -288,7 +350,7 @@ function Admin() {
               </article>
             );
           })}
-          {orders.length === 0 && <p className="placeholder">No orders placed yet.</p>}
+          {filteredOrders.length === 0 && <p className="placeholder">No orders found for this filter.</p>}
         </div>
       </section>
     </section>
