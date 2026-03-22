@@ -2,6 +2,24 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const MENU_BANNER_IMAGES = [
+  {
+    src: 'https://www.yodeck.com/wp-content/uploads/2022/07/cafe-menu-board-template.jpg',
+    alt: 'Canteen menu board with assorted dishes',
+    caption: 'Daily specials board'
+  },
+  {
+    src: 'https://onhisowntrip.com/wp-content/uploads/2025/12/Screenshot-2025-12-29-at-4.05.35%E2%80%AFPM.png',
+    alt: 'Street food counter and menu signage',
+    caption: 'Fresh picks at the counter'
+  },
+  {
+    src: 'https://media.istockphoto.com/id/1457979959/photo/snack-junk-fast-food-on-table-in-restaurant-soup-sauce-ornament-grill-hamburger-french-fries.jpg?s=612x612&w=0&k=20&c=QbFk2SfDb-7oK5Wo9dKmzFGNoi-h8HVEdOYWZbIjffo=',
+    alt: 'Restaurant chalkboard menu display',
+    caption: 'Know your options before ordering'
+  }
+];
+
 const parsePrepMinutes = (value) => {
   if (typeof value === 'number' && !Number.isNaN(value)) {
     return value;
@@ -43,6 +61,8 @@ function Menu() {
   const [toast, setToast] = useState(null); // floating toast
   const [placingId, setPlacingId] = useState('');
   const [quantities, setQuantities] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSlide, setActiveSlide] = useState(0);
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
 
@@ -73,6 +93,14 @@ function Menu() {
 
     fetchMenu();
   }, [userId, navigate]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % MENU_BANNER_IMAGES.length);
+    }, 3800);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const handleQuantityChange = (id, value) => {
     const numeric = Math.max(1, parseInt(value, 10) || 1);
@@ -123,6 +151,14 @@ function Menu() {
     }
   };
 
+  const filteredMenu = menu.filter((item) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const name = (item.name || '').toLowerCase();
+    const category = (item.category || '').toLowerCase();
+    return name.includes(query) || category.includes(query);
+  });
+
   return (
     <section className="page-section">
       <div className="section-heading">
@@ -131,6 +167,40 @@ function Menu() {
           <h2>Pick what fits your break.</h2>
         </div>
         <button className="ghost-btn" onClick={fetchMenu} disabled={loading}>Refresh</button>
+      </div>
+
+      <section className="menu-billboard" aria-label="Canteen highlights">
+        <div className="menu-slider-track" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
+          {MENU_BANNER_IMAGES.map((photo) => (
+            <figure key={photo.src} className="menu-slide">
+              <img src={photo.src} alt={photo.alt} loading="lazy" />
+              <figcaption>{photo.caption}</figcaption>
+            </figure>
+          ))}
+        </div>
+
+        <div className="menu-slider-controls">
+          {MENU_BANNER_IMAGES.map((photo, index) => (
+            <button
+              key={`${photo.caption}-${index}`}
+              type="button"
+              className={`menu-dot${activeSlide === index ? ' active' : ''}`}
+              onClick={() => setActiveSlide(index)}
+              aria-label={`Show slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      </section>
+
+      <div className="menu-search-wrap">
+        <input
+          type="text"
+          className="menu-search-input"
+          placeholder="Search dishes or category..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <p className="menu-search-meta">Showing {filteredMenu.length} of {menu.length} items</p>
       </div>
 
       {/* Floating Toast Notification */}
@@ -146,9 +216,9 @@ function Menu() {
         <div className="inline-banner error">{error}</div>
       )}
 
-      {!loading && !error && (
+      {!loading && !error && filteredMenu.length > 0 && (
         <div className="card-grid">
-          {menu.map(item => {
+          {filteredMenu.map(item => {
             const rating = typeof item.rating === 'number'
               ? item.rating.toFixed(1)
               : '4.0';
@@ -202,6 +272,13 @@ function Menu() {
               </article>
             );
           })}
+        </div>
+      )}
+
+      {!loading && !error && filteredMenu.length === 0 && (
+        <div className="empty-state compact-empty">
+          <h3>No matching items</h3>
+          <p>Try another keyword like dosa, rice, snack, or drink.</p>
         </div>
       )}
     </section>

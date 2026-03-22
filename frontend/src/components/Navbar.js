@@ -1,14 +1,26 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 function Navbar() {
-  const navLinkClass = ({ isActive }) => `nav-link${isActive ? ' active' : ''}`;
   const [userName, setUserName] = useState(localStorage.getItem('userName'));
   const [userId, setUserId] = useState(localStorage.getItem('userId'));
   const [landingSection, setLandingSection] = useState('home');
   const [navBanner, setNavBanner] = useState('');
+  const [activePillStyle, setActivePillStyle] = useState({ opacity: 0, left: 0, width: 0 });
+  const navLinksRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const activeKey = useMemo(() => {
+    if (location.pathname === '/') {
+      return landingSection;
+    }
+
+    if (location.pathname === '/login') return 'login';
+    if (location.pathname === '/menu') return 'menu';
+    if (location.pathname === '/orders') return 'orders';
+    return '';
+  }, [location.pathname, landingSection]);
+
   const handleProtectedNav = (e, route) => {
     if (!userId) {
       e.preventDefault();
@@ -50,6 +62,37 @@ function Navbar() {
   }, [location.pathname, location.hash]);
 
   useEffect(() => {
+    const navRoot = navLinksRef.current;
+    if (!navRoot || !activeKey) {
+      setActivePillStyle((prev) => ({ ...prev, opacity: 0 }));
+      return;
+    }
+
+    const updatePill = () => {
+      const activeLink = navRoot.querySelector(`[data-nav-key="${activeKey}"]`);
+      if (!activeLink) {
+        setActivePillStyle((prev) => ({ ...prev, opacity: 0 }));
+        return;
+      }
+
+      const navRect = navRoot.getBoundingClientRect();
+      const linkRect = activeLink.getBoundingClientRect();
+      setActivePillStyle({
+        opacity: 1,
+        left: linkRect.left - navRect.left,
+        width: linkRect.width
+      });
+    };
+
+    const frame = requestAnimationFrame(updatePill);
+    window.addEventListener('resize', updatePill);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', updatePill);
+    };
+  }, [activeKey, location.pathname, location.hash]);
+
+  useEffect(() => {
     const onSectionChange = (event) => {
       const next = event?.detail?.section;
       if (location.pathname === '/' && next) {
@@ -79,13 +122,22 @@ function Navbar() {
         <div className="nav-logo">Canteen Ahead</div>
         <p>Reserve your meal before the rush.</p>
       </div>
-      <nav className="nav-links">
-        <NavLink to="/" className={({ isActive }) => `nav-link${(isActive && landingSection === 'home') ? ' active' : ''}`} end>Home</NavLink>
-        <Link to="/#about" className={`nav-link${location.pathname === '/' && landingSection === 'about' ? ' active' : ''}`}>About</Link>
-        <Link to="/#features" className={`nav-link${location.pathname === '/' && landingSection === 'features' ? ' active' : ''}`}>Features</Link>
-        <NavLink to="/login" className={navLinkClass}>Login</NavLink>
-        <NavLink to="/menu" className={navLinkClass} onClick={e => handleProtectedNav(e, '/menu')}>Menu</NavLink>
-        <NavLink to="/orders" className={navLinkClass} onClick={e => handleProtectedNav(e, '/orders')}>Orders</NavLink>
+      <nav className="nav-links" ref={navLinksRef}>
+        <span
+          className="nav-active-pill"
+          aria-hidden="true"
+          style={{
+            opacity: activePillStyle.opacity,
+            width: `${activePillStyle.width}px`,
+            transform: `translateX(${activePillStyle.left}px)`
+          }}
+        />
+        <NavLink to="/" className={`nav-link${activeKey === 'home' ? ' active' : ''}`} data-nav-key="home" end>Home</NavLink>
+        <Link to="/#about" className={`nav-link${activeKey === 'about' ? ' active' : ''}`} data-nav-key="about">About</Link>
+        <Link to="/#features" className={`nav-link${activeKey === 'features' ? ' active' : ''}`} data-nav-key="features">Features</Link>
+        <NavLink to="/login" className={`nav-link${activeKey === 'login' ? ' active' : ''}`} data-nav-key="login">Login</NavLink>
+        <NavLink to="/menu" className={`nav-link${activeKey === 'menu' ? ' active' : ''}`} data-nav-key="menu" onClick={e => handleProtectedNav(e, '/menu')}>Menu</NavLink>
+        <NavLink to="/orders" className={`nav-link${activeKey === 'orders' ? ' active' : ''}`} data-nav-key="orders" onClick={e => handleProtectedNav(e, '/orders')}>Orders</NavLink>
       </nav>
 
       {navBanner && (
