@@ -998,6 +998,85 @@
   flex-wrap: wrap;
 }
 
+/* Admin Panel */
+.admin-shell {
+  padding: 2rem;
+  background-color: #f9fafb;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.admin-overview-card {
+  background-color: #fff;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.admin-overview-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08);
+}
+
+.admin-overview-card .value {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.admin-overview-card .label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.admin-orders-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.admin-filter-tabs {
+    display: flex;
+    gap: 0.5rem;
+    background-color: #e5e7eb;
+    padding: 0.5rem;
+    border-radius: 0.75rem;
+}
+
+.admin-filter-tabs button {
+    padding: 0.5rem 1rem;
+    border: none;
+    background-color: transparent;
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.admin-filter-tabs button.active-tab {
+    background-color: #fff;
+    color: var(--primary);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+
 .order-id {
   margin: 0;
   font-weight: 600;
@@ -1149,6 +1228,109 @@
 .ghost-btn:hover:not(:disabled) {
   background: rgba(58, 102, 255, 0.07);
   color: var(--accent);
+}
+
+.admin-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-subtitle {
+  margin: 8px 0 0;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-login-panel {
+  max-width: 460px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.admin-card {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.admin-card h3 {
+  margin: 0 0 14px;
+}
+
+.admin-form {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-list-item {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.admin-item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.admin-item-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-danger {
+  border: 1px solid rgba(198, 40, 40, 0.35);
+  color: #c62828;
+}
+
+.admin-orders-card {
+  margin-top: 4px;
+}
+
+.order-admin-item {
+  background: #fff;
+}
+
+.order-admin-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.admin-status-controls {
+  min-width: 190px;
 }
 
 .quantity-card-anim {

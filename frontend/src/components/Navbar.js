@@ -10,6 +10,7 @@ function Navbar() {
   const navLinksRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const isAdminRoute = location.pathname === '/admin';
   const activeKey = useMemo(() => {
     if (location.pathname === '/') {
       return landingSection;
@@ -86,9 +87,25 @@ function Navbar() {
 
     const frame = requestAnimationFrame(updatePill);
     window.addEventListener('resize', updatePill);
+    navRoot.addEventListener('scroll', updatePill, { passive: true });
+
+    const activeLink = navRoot.querySelector(`[data-nav-key="${activeKey}"]`);
+    let resizeObserver;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updatePill);
+      resizeObserver.observe(navRoot);
+      if (activeLink) {
+        resizeObserver.observe(activeLink);
+      }
+    }
+
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', updatePill);
+      navRoot.removeEventListener('scroll', updatePill);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
     };
   }, [activeKey, location.pathname, location.hash]);
 
@@ -136,8 +153,12 @@ function Navbar() {
         <Link to="/#about" className={`nav-link${activeKey === 'about' ? ' active' : ''}`} data-nav-key="about">About</Link>
         <Link to="/#features" className={`nav-link${activeKey === 'features' ? ' active' : ''}`} data-nav-key="features">Features</Link>
         <NavLink to="/login" className={`nav-link${activeKey === 'login' ? ' active' : ''}`} data-nav-key="login">Login</NavLink>
-        <NavLink to="/menu" className={`nav-link${activeKey === 'menu' ? ' active' : ''}`} data-nav-key="menu" onClick={e => handleProtectedNav(e, '/menu')}>Menu</NavLink>
-        <NavLink to="/orders" className={`nav-link${activeKey === 'orders' ? ' active' : ''}`} data-nav-key="orders" onClick={e => handleProtectedNav(e, '/orders')}>Orders</NavLink>
+        {!isAdminRoute && (
+          <NavLink to="/menu" className={`nav-link${activeKey === 'menu' ? ' active' : ''}`} data-nav-key="menu" onClick={e => handleProtectedNav(e, '/menu')}>Menu</NavLink>
+        )}
+        {!isAdminRoute && (
+          <NavLink to="/orders" className={`nav-link${activeKey === 'orders' ? ' active' : ''}`} data-nav-key="orders" onClick={e => handleProtectedNav(e, '/orders')}>Orders</NavLink>
+        )}
       </nav>
 
       {navBanner && (
