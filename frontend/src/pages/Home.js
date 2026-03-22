@@ -2,6 +2,16 @@ import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+const campusQuotes = [
+  'Good food tastes better when shared with great friends.',
+  'A quick meal and a long laugh can fix almost any college day.',
+  'Friends gather where food is warm and stories are endless.',
+  'The best campus memories start with a table full of snacks.',
+  'Food brings us to the table, friendship keeps us there.',
+  'Some of the best group projects begin over fries and chai.',
+  'Eat together, smile together, and make every break count.'
+];
+
 const formatTimeLabel = (isoTime) => {
   if (!isoTime) return '';
   const date = new Date(isoTime);
@@ -20,6 +30,7 @@ function Home() {
     pendingCount: 0,
     message: ''
   });
+  const [quoteIndex, setQuoteIndex] = useState(0);
   const pageRef = useRef(null);
   const highlightRef = useRef(null);
   const aboutRef = useRef(null);
@@ -155,6 +166,16 @@ function Home() {
     };
   }, [userId]);
 
+  useEffect(() => {
+    const quoteTimer = setInterval(() => {
+      setQuoteIndex((prev) => (prev + 1) % campusQuotes.length);
+    }, 4500);
+
+    return () => {
+      clearInterval(quoteTimer);
+    };
+  }, []);
+
   return (
     <section className="page-section public-home" ref={pageRef}>
       <div className="public-home-hero" data-home-section="home" id="home">
@@ -175,6 +196,10 @@ function Home() {
               {userName ? 'Switch Account' : 'Login / Register'}
             </button>
           )}
+        </div>
+
+        <div className="quote-rotator" aria-live="polite" aria-atomic="true">
+          <p className="quote-text" key={quoteIndex}>{campusQuotes[quoteIndex]}</p>
         </div>
 
         {userId && (

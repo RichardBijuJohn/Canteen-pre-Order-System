@@ -31,16 +31,23 @@ function Orders() {
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
 
-  const fetchOrders = (id) => {
+  const fetchOrders = (id, options = {}) => {
+    const { silent = false } = options;
     if (!id) return;
-    setLoading(true);
-    setError('');
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     axios.get(`http://localhost:5000/api/orders/${id}`)
       .then(res => {
         setOrders(res.data);
       })
       .catch(() => setError('We cannot reach your recent orders.'))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!silent) {
+          setLoading(false);
+        }
+      });
   };
 
   useEffect(() => {
@@ -51,11 +58,17 @@ function Orders() {
     fetchOrders(userId);
   }, [userId, navigate]);
 
-  // Real-time status update every 30s
+  // Keep the timeline clock and backend status in sync.
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 30000);
+    if (!userId) return undefined;
+
+    const interval = setInterval(() => {
+      setNow(Date.now());
+      fetchOrders(userId, { silent: true });
+    }, 15000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [userId]);
 
   const handleSync = () => fetchOrders(userId);
 

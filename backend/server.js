@@ -22,6 +22,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/orders', require('./routes/order'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Server start
 const PORT = 5000;
