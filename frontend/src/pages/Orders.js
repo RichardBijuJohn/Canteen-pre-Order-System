@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const formatPickupTime = (value) => {
@@ -28,8 +28,36 @@ function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [pickedNotice, setPickedNotice] = useState('');
+  const [reviewBanner, setReviewBanner] = useState({ type: '', message: '' });
+  const [reviewDrafts, setReviewDrafts] = useState({});
+  const previousStatusRef = useRef({});
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
+
+  const notifyPicked = (message) => {
+    if (!message) return;
+    if (typeof window === 'undefined') return;
+
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification('Order picked', { body: message });
+        return;
+      }
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+            new Notification('Order picked', { body: message });
+          } else {
+            window.alert(message);
+          }
+        });
+        return;
+      }
+    }
+
+    window.alert(message);
+  };
 
   const fetchOrders = (id, options = {}) => {
     const { silent = false } = options;
@@ -40,7 +68,31 @@ function Orders() {
     }
     axios.get(`http://localhost:5000/api/orders/${id}`)
       .then(res => {
-        setOrders(res.data);
+        const nextOrders = res.data || [];
+        const previousStatusMap = previousStatusRef.current || {};
+        let pickedMessage = '';
+
+        nextOrders.forEach((order) => {
+          const statusKey = String(order.status || '').toLowerCase();
+          const wasPicked = String(previousStatusMap[order._id] || '').toLowerCase().includes('picked');
+          const isPicked = statusKey.includes('picked');
+          if (!wasPicked && isPicked) {
+            const shortId = order._id ? order._id.slice(-5) : '00000';
+            pickedMessage = `Order #${shortId} picked.`;
+          }
+        });
+
+        previousStatusRef.current = nextOrders.reduce((acc, order) => {
+          acc[order._id] = order.status || '';
+          return acc;
+        }, {});
+
+        if (pickedMessage) {
+          setPickedNotice(pickedMessage);
+          notifyPicked(pickedMessage);
+        }
+
+        setOrders(nextOrders);
       })
       .catch(() => setError('We cannot reach your recent orders.'))
       .finally(() => {
@@ -70,7 +122,59 @@ function Orders() {
     return () => clearInterval(interval);
   }, [userId]);
 
+  useEffect(() => {
+    if (!pickedNotice) return undefined;
+    const timer = setTimeout(() => setPickedNotice(''), 2600);
+    return () => clearTimeout(timer);
+  }, [pickedNotice]);
+
+  useEffect(() => {
+    if (!reviewBanner.message) return undefined;
+    const timer = setTimeout(() => setReviewBanner({ type: '', message: '' }), 2600);
+    return () => clearTimeout(timer);
+  }, [reviewBanner]);
+
   const handleSync = () => fetchOrders(userId);
+
+  const submitReview = async (orderId) => {
+    const draft = reviewDrafts[orderId] || {};
+    const ratingValue = Number(draft.rating);
+
+    if (!userId) {
+      setReviewBanner({ type: 'error', message: 'Login required to review orders.' });
+      return;
+    }
+
+    if (!ratingValue || ratingValue < 1 || ratingValue > 5) {
+      setReviewBanner({ type: 'error', message: 'Pick a rating between 1 and 5.' });
+      return;
+    }
+
+    try {
+      setReviewDrafts((prev) => ({
+        ...prev,
+        [orderId]: { ...prev[orderId], saving: true }
+      }));
+      await axios.post(`http://localhost:5000/api/orders/${orderId}/review`, {
+        userId,
+        rating: ratingValue
+      });
+      setReviewBanner({ type: 'success', message: 'Thanks for the review.' });
+      setReviewDrafts((prev) => ({
+        ...prev,
+        [orderId]: { rating: '' }
+      }));
+      fetchOrders(userId, { silent: true });
+    } catch (err) {
+      const message = err?.response?.data?.msg || 'Unable to submit review.';
+      setReviewBanner({ type: 'error', message });
+    } finally {
+      setReviewDrafts((prev) => ({
+        ...prev,
+        [orderId]: { ...prev[orderId], saving: false }
+      }));
+    }
+  };
 
   const statusTone = (status = '') => {
     const key = status.toLowerCase();
@@ -130,6 +234,16 @@ function Orders() {
         <div className="inline-banner error">Sign in to review your previous orders.</div>
       )}
 
+      {pickedNotice && (
+        <div className="inline-banner success">{pickedNotice}</div>
+      )}
+
+      {reviewBanner.message && (
+        <div className={`inline-banner ${reviewBanner.type === 'error' ? 'error' : 'success'}`}>
+          {reviewBanner.message}
+        </div>
+      )}
+
       {userId && loading && <div className="placeholder">Checking your most recent orders...</div>}
 
       {userId && error && !loading && <div className="inline-banner error">{error}</div>}
@@ -148,10 +262,14 @@ function Orders() {
             const itemCount = order.items && order.items.length
               ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
               : 1;
+            const review = order.review || {};
+            const hasReview = Boolean(review.rating);
+            const reviewDraft = reviewDrafts[order._id] || {};
 
             const orderState = computeOrderState(order, now);
             const isPicked = orderState === 'picked';
             const isReady = orderState === 'done';
+            const canReview = Boolean(order.pickedAt) || isPicked;
             const pickupLabel = formatPickupTime(order.pickupTime);
             return (
               <article key={order._id || `order-${index}`} className={`order-card${isReady ? ' ready-pulse' : ''}`}>
@@ -213,6 +331,44 @@ function Orders() {
                       });
                     })()}
                   </ul>
+                )}
+
+                {canReview && !hasReview && (
+                  <div className="order-review">
+                    <p className="order-label">Rate your pickup</p>
+                    <div className="order-review-controls">
+                      <select
+                        className="input-field"
+                        value={reviewDraft.rating || ''}
+                        onChange={(e) =>
+                          setReviewDrafts((prev) => ({
+                            ...prev,
+                            [order._id]: { ...prev[order._id], rating: e.target.value }
+                          }))
+                        }
+                      >
+                        <option value="">Rating</option>
+                        {[1, 2, 3, 4, 5].map((value) => (
+                          <option key={value} value={value}>{value}</option>
+                        ))}
+                      </select>
+                      <button
+                        className="ghost-btn"
+                        type="button"
+                        onClick={() => submitReview(order._id)}
+                        disabled={reviewDraft.saving}
+                      >
+                        {reviewDraft.saving ? 'Submitting...' : 'Submit review'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {hasReview && (
+                  <div className="order-review">
+                    <p className="order-label">Your review</p>
+                    <p>Rating: {review.rating} / 5</p>
+                  </div>
                 )}
               </article>
             );

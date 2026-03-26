@@ -123,4 +123,50 @@ router.get('/:userId', async (req, res) => {
     }
 });
 
+// Add review for picked order
+router.post('/:orderId/review', async (req, res) => {
+    const { orderId } = req.params;
+    const rawUserId = String(req.body?.userId || '').trim();
+    const ratingValue = Number(req.body?.rating);
+
+    if (!rawUserId) {
+        return res.status(401).json({ msg: 'Login required to review orders.' });
+    }
+
+    if (!Number.isFinite(ratingValue) || ratingValue < 1 || ratingValue > 5) {
+        return res.status(400).json({ msg: 'Rating must be between 1 and 5.' });
+    }
+
+    try {
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ msg: 'Order not found.' });
+        }
+
+        if (String(order.userId) !== rawUserId) {
+            return res.status(403).json({ msg: 'You can only review your own orders.' });
+        }
+
+        const statusKey = String(order.status || '').toLowerCase();
+        if (!statusKey.includes('picked') && !order.pickedAt) {
+            return res.status(400).json({ msg: 'Reviews are available after pickup.' });
+        }
+
+        if (order.review && order.review.rating) {
+            return res.status(400).json({ msg: 'Review already submitted for this order.' });
+        }
+
+        order.review = {
+            rating: ratingValue,
+            createdAt: new Date()
+        };
+
+        await order.save();
+        return res.json({ msg: 'Review saved.', review: order.review });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ msg: 'Unable to save review.' });
+    }
+});
+
 module.exports = router;

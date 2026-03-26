@@ -63,7 +63,8 @@ function Menu() {
   const [quantities, setQuantities] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSlide, setActiveSlide] = useState(0);
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [visibleCount, setVisibleCount] = useState(12);
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
 
@@ -159,93 +160,11 @@ function Menu() {
     const category = (item.category || '').toLowerCase();
     return name.includes(query) || category.includes(query);
   });
-
-  // When menu data or filter changes, update the selected item
-  useEffect(() => {
-    if (filteredMenu.length > 0) {
-      // If the current selected item is not in the new filtered list,
-      // or if nothing is selected, default to the first item.
-      const currentSelectedStillVisible = filteredMenu.some(item => item._id === selectedItem?._id);
-      if (!currentSelectedStillVisible) {
-        setSelectedItem(filteredMenu[0]);
-      }
-    } else {
-      setSelectedItem(null);
-    }
-  }, [searchQuery, menu]);
-
-  const renderSelectedItem = () => {
-    if (!selectedItem) {
-      return (
-        <div className="empty-state compact-empty">
-          <h3>No item selected</h3>
-          <p>Select an item from the list to see details.</p>
-        </div>
-      );
-    }
-
-    const item = selectedItem;
-    const rating = typeof item.rating === 'number'
-      ? item.rating.toFixed(1)
-      : '4.0';
-    const preparationTime = item.preparationTime || '10 min';
-    const quantity = quantities[item._id] || 1;
-    const unitPrice = Number(item.price) || 0;
-    const displayTotal = (unitPrice * quantity).toFixed(2);
-    const imageUrl = item.imageUrl || `https://source.unsplash.com/400x300/?${item.name.split(' ').join(',')}`;
-
-    return (
-      <article className="menu-detail-card">
-        <div className="menu-detail-img-wrap">
-          <img src={imageUrl} alt={item.name} className="menu-detail-img" />
-        </div>
-        
-        <div className="menu-detail-content">
-          <div>
-            <p className="menu-eyebrow">{item.category || 'Chef special'}</p>
-            <h3>{item.name}</h3>
-            <p className="menu-desc">{item.description || 'A delicious dish prepared with the finest ingredients.'}</p>
-          </div>
-
-          <div className="menu-stats">
-            <div className="metric-block">
-              <span className="metric-label">Rating</span>
-              <span className="metric-value">{rating} / 5</span>
-            </div>
-            <div className="metric-block">
-              <span className="metric-label">Prep time</span>
-              <span className="metric-value">{preparationTime}</span>
-            </div>
-          </div>
-
-          <div className="quantity-control">
-            <label>
-              Quantity
-              <input
-                type="number"
-                min="1"
-                className="quantity-input"
-                value={quantity}
-                onChange={(e) => handleQuantityChange(item._id, e.target.value)}
-              />
-            </label>
-            <div className="quantity-total">₹{displayTotal}</div>
-          </div>
-
-          <div className="menu-meta">
-            <span className="menu-price">₹{item.price}</span>
-            <button
-              className="primary-btn"
-              onClick={() => placeOrder(item)}
-              disabled={!userId || placingId === item._id}
-            >
-              {placingId === item._id ? 'Scheduling...' : 'Pre-order'}
-            </button>
-          </div>
-        </div>
-      </article>
-    );
-  };
+  const categories = ['All', ...Array.from(new Set(menu.map(item => item.category).filter(Boolean)))];
+  const categoryFilteredMenu = activeCategory === 'All'
+    ? filteredMenu
+    : filteredMenu.filter((item) => item.category === activeCategory);
+  const visibleItems = categoryFilteredMenu.slice(0, visibleCount);
 
   return (
     <section className="page-section">
@@ -291,50 +210,113 @@ function Menu() {
         <p className="menu-search-meta">Showing {filteredMenu.length} of {menu.length} items</p>
       </div>
 
+      <div className="menu-category-bar" role="tablist" aria-label="Menu categories">
+        {categories.map((category) => (
+          <button
+            key={category}
+            type="button"
+            className={`menu-chip${activeCategory === category ? ' active' : ''}`}
+            onClick={() => {
+              setActiveCategory(category);
+              setVisibleCount(12);
+            }}
+          >
+            {category}
+          </button>
+        ))}
+      </div>
+
       {/* Floating Toast Notification */}
       {toast && (
         <div className={`floating-toast ${toast.type}`}>{toast.message}</div>
       )}
 
-      <div className="menu-layout">
-        <div className="menu-list-panel">
-          {loading && <div className="placeholder">Loading menu...</div>}
-          
-          {error && !loading && <div className="inline-banner error">{error}</div>}
+      {loading && (
+        <div className="placeholder">Loading menu...</div>
+      )}
 
-          {!loading && !error && filteredMenu.length > 0 && (
-            <div className="menu-list">
-              {filteredMenu.map(item => (
-                <div
-                  key={item._id}
-                  className={`menu-list-item ${selectedItem?._id === item._id ? 'active' : ''}`}
-                  onClick={() => setSelectedItem(item)}
-                  role="button"
-                  tabIndex="0"
-                  onKeyPress={(e) => e.key === 'Enter' && setSelectedItem(item)}
-                >
-                  <div className="item-info">
-                    <span className="item-name">{item.name}</span>
-                    <span className="item-category">{item.category}</span>
+      {error && !loading && (
+        <div className="inline-banner error">{error}</div>
+      )}
+
+      {!loading && !error && categoryFilteredMenu.length > 0 && (
+        <>
+          <div className="card-grid">
+            {visibleItems.map(item => {
+              const rating = typeof item.rating === 'number'
+                ? item.rating.toFixed(1)
+                : '4.0';
+              const preparationTime = item.preparationTime || '10 min';
+              const quantity = quantities[item._id] || 1;
+              const unitPrice = Number(item.price) || 0;
+              const displayTotal = (unitPrice * quantity).toFixed(2);
+
+              return (
+                <article key={item._id} className="menu-card">
+                  <div>
+                    <p className="menu-eyebrow">{item.category || 'Chef special'}</p>
+                    <h3>{item.name}</h3>
                   </div>
-                  <span className="item-price">₹{item.price}</span>
-                </div>
-              ))}
+
+                  <div className="menu-stats">
+                    <div className="metric-block">
+                      <span className="metric-label">Rating</span>
+                      <span className="metric-value">{rating} / 5</span>
+                    </div>
+                    <div className="metric-block">
+                      <span className="metric-label">Prep time</span>
+                      <span className="metric-value">{preparationTime}</span>
+                    </div>
+                  </div>
+
+                  <div className="quantity-control">
+                    <label>
+                      Quantity
+                      <input
+                        type="number"
+                        min="1"
+                        className="quantity-input"
+                        value={quantity}
+                        onChange={(e) => handleQuantityChange(item._id, e.target.value)}
+                      />
+                    </label>
+                    <div className="quantity-total">₹{displayTotal}</div>
+                  </div>
+
+                  <div className="menu-meta">
+                    <span className="menu-price">₹{item.price}</span>
+                    <button
+                      className="primary-btn"
+                      onClick={() => placeOrder(item)}
+                      disabled={!userId || placingId === item._id}
+                    >
+                      {placingId === item._id ? 'Scheduling...' : 'Pre-order'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {categoryFilteredMenu.length > visibleItems.length && (
+            <div className="menu-load-more">
+              <button
+                className="ghost-btn"
+                onClick={() => setVisibleCount((prev) => prev + 12)}
+              >
+                Load more items
+              </button>
             </div>
           )}
+        </>
+      )}
 
-          {!loading && !error && filteredMenu.length === 0 && (
-            <div className="empty-state compact-empty">
-              <h3>No matching items</h3>
-              <p>Try another keyword like dosa, rice, snack, or drink.</p>
-            </div>
-          )}
+      {!loading && !error && categoryFilteredMenu.length === 0 && (
+        <div className="empty-state compact-empty">
+          <h3>No matching items</h3>
+          <p>Try another keyword like dosa, rice, snack, or drink.</p>
         </div>
-
-        <div className="menu-detail-panel">
-          {renderSelectedItem()}
-        </div>
-      </div>
+      )}
     </section>
   );
 }
