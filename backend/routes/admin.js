@@ -229,7 +229,15 @@ router.patch('/orders/:orderId/status', requireAdmin, async (req, res) => {
       return res.status(404).json({ msg: 'Order not found.' });
     }
 
+    const currentStatusKey = String(order.status || '').toLowerCase();
+    if (currentStatusKey.includes('picked') && nextStatus === 'Ready for Pickup') {
+      return res.status(400).json({ msg: 'Picked orders cannot be set back to Ready for Pickup.' });
+    }
+
     order.status = nextStatus;
+    if (nextStatus === 'Picked') {
+      order.pickedAt = order.pickedAt || new Date();
+    }
     if (nextStatus === 'Ready for Pickup' || nextStatus === 'Picked' || nextStatus === 'Complete') {
       order.items = (order.items || []).map((item) => {
         const base = typeof item.toObject === 'function' ? item.toObject() : item;
