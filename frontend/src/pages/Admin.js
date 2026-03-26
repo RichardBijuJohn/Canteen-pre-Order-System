@@ -13,7 +13,7 @@ const defaultMenuForm = {
   available: true
 };
 
-const ORDER_STATUS_OPTIONS = ['Pending', 'Ready for Pickup', 'Picked', 'Cancelled', 'Complete'];
+const ORDER_STATUS_OPTIONS = [ 'Ready for Pickup', 'Picked'];
 
 const formatPickupTime = (value) => {
   if (!value) return 'Awaiting slot';
@@ -399,6 +399,9 @@ function Admin() {
         <div className="admin-list">
           {filteredOrders.map((order) => {
             const itemCount = order.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
+            const statusKey = String(order.status || '').toLowerCase();
+            const isPicked = statusKey.includes('picked');
+            const statusOptions = isPicked ? ['Picked'] : ORDER_STATUS_OPTIONS;
             return (
               <article key={order._id} className="admin-list-item order-admin-item">
                 <div className="order-admin-head">
@@ -411,9 +414,9 @@ function Admin() {
                       className="input-field"
                       value={order.status || 'Pending'}
                       onChange={(e) => updateOrderStatus(order._id, e.target.value)}
-                      disabled={statusSavingId === order._id}
+                      disabled={statusSavingId === order._id || isPicked}
                     >
-                      {ORDER_STATUS_OPTIONS.map((status) => (
+                      {statusOptions.map((status) => (
                         <option key={status} value={status}>{status}</option>
                       ))}
                     </select>

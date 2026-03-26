@@ -5,7 +5,12 @@ const OrderSchema = new mongoose.Schema({
     items: Array,
     totalAmount: Number,
     pickupTime: String,
-    status: { type: String, default: "Pending" }
+    status: { type: String, default: "Pending" },
+    pickedAt: Date,
+    review: {
+        rating: Number,
+        createdAt: Date
+    }
 });
 
 module.exports = mongoose.model('Order', OrderSchema);
