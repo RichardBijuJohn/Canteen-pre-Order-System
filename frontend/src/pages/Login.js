@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 function Login() {
   const [mode, setMode] = useState('login');
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [status, setStatus] = useState({ type: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -12,18 +12,19 @@ function Login() {
   const isLogin = mode === 'login';
 
   useEffect(() => {
-    if (localStorage.getItem('userId')) {
+    const hasUserSession = Boolean(localStorage.getItem('userId'));
+    const hasAdminSession = Boolean(localStorage.getItem('adminToken'));
+    if (hasUserSession) {
       navigate('/home', { replace: true });
+      return;
+    }
+    if (hasAdminSession) {
+      navigate('/admin', { replace: true });
     }
   }, [navigate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const switchMode = (nextMode) => {
-    setMode(nextMode);
-    setStatus({ type: '', message: '' });
   };
 
   const handleSubmit = async (e) => {
@@ -32,41 +33,63 @@ function Login() {
     setStatus({ type: '', message: '' });
 
     try {
-      if (isLogin) {
-        const res = await axios.post('http://localhost:5000/api/auth/login', {
-          email: formData.email,
-          password: formData.password
-        });
-
-        if (res.data && res.data.user) {
-          localStorage.setItem('userId', res.data.user._id);
-          localStorage.setItem('userName', res.data.user.name);
-          localStorage.setItem('userEmail', res.data.user.email);
-          window.dispatchEvent(new Event('user-auth-changed'));
-          window.location.href = '/home';
+      if (!isLogin) {
+        if (formData.email.trim().toLowerCase() === 'admin@canteen.local') {
+          setStatus({ type: 'error', message: 'Admin accounts cannot be registered from this page.' });
           return;
         }
 
-        setStatus({ type: 'error', message: res.data?.msg || 'Invalid credentials' });
-      } else {
-        const res = await axios.post('http://localhost:5000/api/auth/register', {
-          name: formData.name,
+        const registerRes = await axios.post('http://localhost:5000/api/auth/register', {
+          name: (formData.email.split('@')[0] || 'Student').slice(0, 30),
           email: formData.email,
           password: formData.password
         });
 
-        if (res.data?.msg) {
-          setStatus({ type: 'success', message: 'Account created. Sign in to continue.' });
+        if (registerRes.data?.msg) {
+          setStatus({ type: 'success', message: 'Account created. Please login now.' });
           setMode('login');
-          setFormData({ name: '', email: formData.email, password: '' });
           return;
         }
 
-        setStatus({ type: 'error', message: 'Registration failed.' });
+        setStatus({ type: 'error', message: 'Registration failed. Try again.' });
+        return;
       }
+
+      const adminRes = await axios.post('http://localhost:5000/api/admin/login', {
+        email: formData.email,
+        password: formData.password
+      }).catch(() => null);
+
+      if (adminRes?.data?.token) {
+        localStorage.removeItem('userId');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userEmail');
+        localStorage.setItem('adminToken', adminRes.data.token);
+        localStorage.setItem('adminName', adminRes.data?.admin?.name || 'Admin');
+        window.location.href = '/admin';
+        return;
+      }
+
+      const res = await axios.post('http://localhost:5000/api/auth/login', {
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (res.data && res.data.user) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminName');
+        localStorage.setItem('userId', res.data.user._id);
+        localStorage.setItem('userName', res.data.user.name);
+        localStorage.setItem('userEmail', res.data.user.email);
+        window.dispatchEvent(new Event('user-auth-changed'));
+        window.location.href = '/home';
+        return;
+      }
+
+      setStatus({ type: 'error', message: res.data?.msg || 'Invalid email or password.' });
     } catch (err) {
       console.log(err);
-      setStatus({ type: 'error', message: 'Something went wrong. Try again.' });
+      setStatus({ type: 'error', message: isLogin ? 'Invalid email or password.' : 'Unable to register right now.' });
     } finally {
       setSubmitting(false);
     }
@@ -91,14 +114,20 @@ function Login() {
           <button
             type="button"
             className={`toggle-btn ${isLogin ? 'active' : ''}`}
-            onClick={() => switchMode('login')}
+            onClick={() => {
+              setMode('login');
+              setStatus({ type: '', message: '' });
+            }}
           >
             Login
           </button>
           <button
             type="button"
             className={`toggle-btn ${!isLogin ? 'active' : ''}`}
-            onClick={() => switchMode('register')}
+            onClick={() => {
+              setMode('register');
+              setStatus({ type: '', message: '' });
+            }}
           >
             Register
           </button>
@@ -111,20 +140,6 @@ function Login() {
         )}
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          {!isLogin && (
-            <label className="form-group">
-              <span>Name</span>
-              <input
-                className="input-field"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Riya Sharma"
-                required
-              />
-            </label>
-          )}
-
           <label className="form-group">
             <span>Email</span>
             <input
@@ -156,16 +171,9 @@ function Login() {
             {submitting ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
           </button>
 
-          <p className="form-footer">
-            {isLogin ? 'Need an account?' : 'Already registered?'}{' '}
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => switchMode(isLogin ? 'register' : 'login')}
-            >
-              {isLogin ? 'Register' : 'Login'}
-            </button>
-          </p>
+          {!isLogin && (
+            <p className="form-footer"></p>
+          )}
         </form>
       </div>
     </section>

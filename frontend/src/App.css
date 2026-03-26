@@ -961,6 +961,41 @@
   font-size: 0.88rem;
 }
 
+.menu-category-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 22px;
+}
+
+.menu-chip {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.menu-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.menu-chip.active {
+  border-color: rgba(255, 123, 95, 0.55);
+  background: rgba(255, 123, 95, 0.12);
+  color: #7a2b1c;
+}
+
+.menu-load-more {
+  display: flex;
+  justify-content: center;
+  margin: 28px 0 6px;
+}
+
 .compact-empty {
   padding: 24px;
   margin-top: 4px;
@@ -1285,6 +1320,80 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.admin-menu-toolbar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.admin-menu-search {
+  width: 100%;
+}
+
+.admin-menu-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-chip {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.admin-chip.active {
+  border-color: rgba(31, 111, 235, 0.55);
+  background: rgba(31, 111, 235, 0.12);
+  color: #1a3f7a;
+}
+
+.admin-menu-card {
+  background: #fff;
+}
+
+.admin-menu-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-menu-title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.admin-menu-meta {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.admin-menu-body {
+  margin-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  padding-top: 12px;
+}
+
+.admin-menu-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
 }
 
 .admin-list-item {

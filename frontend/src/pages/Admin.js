@@ -38,6 +38,10 @@ function Admin() {
   const [statusSavingId, setStatusSavingId] = useState('');
   const [loadingData, setLoadingData] = useState(false);
   const [orderFilter, setOrderFilter] = useState('all');
+  const [menuQuery, setMenuQuery] = useState('');
+  const [menuCategory, setMenuCategory] = useState('All');
+  const [menuVisibleCount, setMenuVisibleCount] = useState(6);
+  const [expandedMenus, setExpandedMenus] = useState({});
 
   const headers = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token]);
 
@@ -127,6 +131,29 @@ function Admin() {
     if (orderFilter === 'all') return orders;
     return orders.filter((order) => String(order.status || '').toLowerCase().includes(orderFilter));
   }, [orders, orderFilter]);
+
+  const menuCategories = useMemo(() => {
+    const categories = menuItems.map((item) => item.category).filter(Boolean);
+    return ['All', ...Array.from(new Set(categories))];
+  }, [menuItems]);
+
+  const filteredMenuItems = useMemo(() => {
+    const query = menuQuery.trim().toLowerCase();
+    const base = menuCategory === 'All'
+      ? menuItems
+      : menuItems.filter((item) => item.category === menuCategory);
+    if (!query) return base;
+    return base.filter((item) => {
+      const name = (item.name || '').toLowerCase();
+      const category = (item.category || '').toLowerCase();
+      return name.includes(query) || category.includes(query);
+    });
+  }, [menuItems, menuCategory, menuQuery]);
+
+  const visibleMenuItems = useMemo(
+    () => filteredMenuItems.slice(0, menuVisibleCount),
+    [filteredMenuItems, menuVisibleCount]
+  );
 
   const addMenuItem = async (e) => {
     e.preventDefault();
@@ -273,30 +300,89 @@ function Admin() {
 
         <section className="admin-card">
           <h3>Menu Inventory</h3>
+          <div className="admin-menu-toolbar">
+            <input
+              className="input-field admin-menu-search"
+              placeholder="Search menu..."
+              value={menuQuery}
+              onChange={(e) => {
+                setMenuQuery(e.target.value);
+                setMenuVisibleCount(6);
+              }}
+            />
+            <div className="admin-menu-chips" role="tablist" aria-label="Menu categories">
+              {menuCategories.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  className={`admin-chip${menuCategory === category ? ' active' : ''}`}
+                  onClick={() => {
+                    setMenuCategory(category);
+                    setMenuVisibleCount(6);
+                  }}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="admin-list">
-            {menuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
               const draft = menuDrafts[item._id] || {};
+              const isExpanded = Boolean(expandedMenus[item._id]);
               return (
-                <article key={item._id} className="admin-list-item">
-                  <div className="admin-item-grid">
-                    <input className="input-field" value={draft.name || ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], name: e.target.value } }))} />
-                    <input className="input-field" type="number" min="1" value={draft.price ?? ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], price: e.target.value } }))} />
-                    <input className="input-field" value={draft.category || ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], category: e.target.value } }))} />
-                    <input className="input-field" value={draft.preparationTime || ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], preparationTime: e.target.value } }))} />
-                    <label className="admin-checkbox">
-                      <input type="checkbox" checked={Boolean(draft.available)} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], available: e.target.checked } }))} />
-                      Available
-                    </label>
+                <article key={item._id} className={`admin-list-item admin-menu-card${isExpanded ? ' expanded' : ''}`}>
+                  <div className="admin-menu-summary">
+                    <div>
+                      <p className="admin-menu-title">{item.name}</p>
+                      <p className="admin-menu-meta">
+                        {item.category || 'Uncategorized'} · Rs {Number(item.price || 0).toFixed(2)} · {item.available ? 'Available' : 'Unavailable'}
+                      </p>
+                    </div>
+                    <div className="admin-item-actions">
+                      <button
+                        className="ghost-btn"
+                        type="button"
+                        onClick={() => setExpandedMenus((prev) => ({ ...prev, [item._id]: !prev[item._id] }))}
+                      >
+                        {isExpanded ? 'Hide' : 'Edit'}
+                      </button>
+                      <button className="ghost-btn admin-danger" onClick={() => deleteMenuItem(item._id)} disabled={menuSavingId === item._id}>Delete</button>
+                    </div>
                   </div>
-                  <div className="admin-item-actions">
-                    <button className="ghost-btn" onClick={() => saveMenuDraft(item._id)} disabled={menuSavingId === item._id}>{menuSavingId === item._id ? 'Saving...' : 'Save'}</button>
-                    <button className="ghost-btn admin-danger" onClick={() => deleteMenuItem(item._id)} disabled={menuSavingId === item._id}>Delete</button>
-                  </div>
+                  {isExpanded && (
+                    <div className="admin-menu-body">
+                      <div className="admin-item-grid">
+                        <input className="input-field" value={draft.name || ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], name: e.target.value } }))} />
+                        <input className="input-field" type="number" min="1" value={draft.price ?? ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], price: e.target.value } }))} />
+                        <input className="input-field" value={draft.category || ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], category: e.target.value } }))} />
+                        <input className="input-field" value={draft.preparationTime || ''} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], preparationTime: e.target.value } }))} />
+                        <label className="admin-checkbox">
+                          <input type="checkbox" checked={Boolean(draft.available)} onChange={(e) => setMenuDrafts((prev) => ({ ...prev, [item._id]: { ...prev[item._id], available: e.target.checked } }))} />
+                          Available
+                        </label>
+                      </div>
+                      <div className="admin-item-actions">
+                        <button className="ghost-btn" onClick={() => saveMenuDraft(item._id)} disabled={menuSavingId === item._id}>{menuSavingId === item._id ? 'Saving...' : 'Save changes'}</button>
+                      </div>
+                    </div>
+                  )}
                 </article>
               );
             })}
-            {menuItems.length === 0 && <p className="placeholder">No menu items yet.</p>}
+            {filteredMenuItems.length === 0 && <p className="placeholder">No menu items yet.</p>}
           </div>
+          {filteredMenuItems.length > visibleMenuItems.length && (
+            <div className="admin-menu-footer">
+              <button
+                className="ghost-btn"
+                type="button"
+                onClick={() => setMenuVisibleCount((prev) => prev + 6)}
+              >
+                Load more
+              </button>
+            </div>
+          )}
         </section>
       </div>
 
