@@ -1582,6 +1582,16 @@
   font-size: 0.9rem;
 }
 
+.admin-form-context {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(58, 102, 255, 0.08);
+  border: 1px solid rgba(58, 102, 255, 0.2);
+  color: #214b93;
+  font-weight: 600;
+}
+
 .admin-orders-toolbar {
   display: grid;
   gap: 10px;
