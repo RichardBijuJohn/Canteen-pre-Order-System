@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPreorderDraftCount, upsertPreorderDraftItem } from '../utils/preorderDraft';
+import {
+  MAX_PREORDER_TOTAL_QUANTITY,
+  getPreorderDraftCount,
+  upsertPreorderDraftItem
+} from '../utils/preorderDraft';
 
 const MENU_BANNER_IMAGES = [
   {
@@ -83,7 +87,7 @@ function Menu() {
   }, []);
 
   const handleQuantityChange = (id, value) => {
-    const numeric = Math.max(1, parseInt(value, 10) || 1);
+    const numeric = Math.min(MAX_PREORDER_TOTAL_QUANTITY, Math.max(1, parseInt(value, 10) || 1));
     setQuantities(prev => ({ ...prev, [id]: numeric }));
   };
 
@@ -95,11 +99,22 @@ function Menu() {
     }
 
     const quantity = quantities[item._id] || 1;
-    upsertPreorderDraftItem(item, quantity);
+    const result = upsertPreorderDraftItem(item, quantity);
     setDraftCount(getPreorderDraftCount());
+
+    if (result.addedQuantity <= 0) {
+      setToast({
+        type: 'error',
+        message: `Order limit reached. You can add up to ${MAX_PREORDER_TOTAL_QUANTITY} total items.`
+      });
+      return;
+    }
+
     setToast({
       type: 'success',
-      message: `${item.name || 'Item'} added to pre-order list.`
+      message: result.reachedLimit
+        ? `${item.name || 'Item'} added. Max ${MAX_PREORDER_TOTAL_QUANTITY} items reached.`
+        : `${item.name || 'Item'} added to pre-order list.`
     });
   };
 
@@ -163,6 +178,7 @@ function Menu() {
           onChange={(e) => setSearchQuery(e.target.value)}
         />
         <p className="menu-search-meta">Showing {filteredMenu.length} of {menu.length} items</p>
+        <p className="menu-search-meta">Maximum {MAX_PREORDER_TOTAL_QUANTITY} total items per order.</p>
       </div>
 
       <div className="menu-category-bar" role="tablist" aria-label="Menu categories">
@@ -230,6 +246,7 @@ function Menu() {
                       <input
                         type="number"
                         min="1"
+                        max={MAX_PREORDER_TOTAL_QUANTITY}
                         className="quantity-input"
                         value={quantity}
                         onChange={(e) => handleQuantityChange(item._id, e.target.value)}
@@ -241,7 +258,7 @@ function Menu() {
                   <div className="menu-meta">
                     <span className="menu-price">₹{item.price}</span>
                     <button
-                      className="primary-btn"
+                      className="primary-btn menu-add-btn"
                       onClick={() => addToPreorder(item)}
                       disabled={!userId}
                     >
