@@ -17,7 +17,7 @@ function Navbar() {
     }
 
     if (location.pathname === '/login') return 'login';
-    if (location.pathname === '/menu') return 'menu';
+    if (location.pathname === '/menu' || location.pathname === '/preorder-review') return 'menu';
     if (location.pathname === '/orders') return 'orders';
     return '';
   }, [location.pathname, landingSection]);

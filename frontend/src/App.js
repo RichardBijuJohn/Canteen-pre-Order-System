@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Features from './pages/Features';
 import Admin from './pages/Admin';
+import PreorderReview from './pages/PreorderReview';
 import Navbar from './components/Navbar';
 import './App.css';
 
@@ -22,6 +23,7 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/features" element={<Features />} />
             <Route path="/menu" element={<Menu />} />
+            <Route path="/preorder-review" element={<PreorderReview />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/admin" element={<Admin />} />
           </Routes>

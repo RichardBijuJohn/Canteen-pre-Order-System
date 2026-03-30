@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getPreorderDraftCount, upsertPreorderDraftItem } from '../utils/preorderDraft';
 
 const MENU_BANNER_IMAGES = [
   {
@@ -20,51 +21,17 @@ const MENU_BANNER_IMAGES = [
   }
 ];
 
-const parsePrepMinutes = (value) => {
-  if (typeof value === 'number' && !Number.isNaN(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const match = value.match(/(\d+)/);
-    if (match) {
-      return parseInt(match[1], 10);
-    }
-  }
-  return 15;
-};
-
-const computePickupSlot = (minutes = 15) => {
-  const eta = new Date(Date.now() + minutes * 60000);
-  return {
-    iso: eta.toISOString(),
-    label: eta.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-  };
-};
-
-const WORKING_HOURS = {
-  startMinutes: 8 * 60, // 8:00 AM
-  endMinutes: 22 * 60 // 10:00 PM
-};
-
-const WORKING_HOURS_LABEL = '8:00 AM - 10:00 PM';
-
-const isWithinWorkingHours = () => {
-  const now = new Date();
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  return minutes >= WORKING_HOURS.startMinutes && minutes < WORKING_HOURS.endMinutes;
-};
-
 function Menu() {
   const [menu, setMenu] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null); // floating toast
-  const [placingId, setPlacingId] = useState('');
   const [quantities, setQuantities] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeCategory, setActiveCategory] = useState('All');
   const [visibleCount, setVisibleCount] = useState(12);
+  const [draftCount, setDraftCount] = useState(() => getPreorderDraftCount());
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
 
@@ -104,53 +71,36 @@ function Menu() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const syncDraftCount = () => setDraftCount(getPreorderDraftCount());
+    window.addEventListener('storage', syncDraftCount);
+    window.addEventListener('preorder-draft-changed', syncDraftCount);
+
+    return () => {
+      window.removeEventListener('storage', syncDraftCount);
+      window.removeEventListener('preorder-draft-changed', syncDraftCount);
+    };
+  }, []);
+
   const handleQuantityChange = (id, value) => {
     const numeric = Math.max(1, parseInt(value, 10) || 1);
     setQuantities(prev => ({ ...prev, [id]: numeric }));
   };
 
-  const placeOrder = async (item) => {
+  const addToPreorder = (item) => {
     if (!userId) {
       setToast({ type: 'error', message: 'Please log in before placing an order.' });
       navigate('/login', { replace: true });
       return;
     }
 
-    if (!isWithinWorkingHours()) {
-      setToast({ type: 'error', message: `Orders are open only between ${WORKING_HOURS_LABEL} (college hours).` });
-      return;
-    }
-
-    setPlacingId(item._id);
-    setToast(null);
     const quantity = quantities[item._id] || 1;
-    const unitPrice = Number(item.price) || 0;
-    const totalAmount = unitPrice * quantity;
-    const prepMinutes = parsePrepMinutes(item.preparationTime);
-    const pickupSlot = computePickupSlot(prepMinutes);
-
-    try {
-      await axios.post('http://localhost:5000/api/orders/place', {
-        userId,
-        items: [{ ...item, quantity, price: unitPrice }],
-        totalAmount,
-        pickupTime: pickupSlot.iso
-      });
-
-      setToast({ type: 'success', message: `${item.name} scheduled for ${pickupSlot.label}.` });
-    } catch (err) {
-      console.log(err);
-      if (err.response?.status === 401) {
-        setToast({ type: 'error', message: 'Session expired. Sign in again to continue.' });
-        navigate('/login', { replace: true });
-      } else if (err.response?.status === 403) {
-        setToast({ type: 'error', message: err.response?.data?.msg || `Orders are open only between ${WORKING_HOURS_LABEL} (college hours).` });
-      } else {
-        setToast({ type: 'error', message: 'Order could not be created. Try again.' });
-      }
-    } finally {
-      setPlacingId('');
-    }
+    upsertPreorderDraftItem(item, quantity);
+    setDraftCount(getPreorderDraftCount());
+    setToast({
+      type: 'success',
+      message: `${item.name || 'Item'} added to pre-order list.`
+    });
   };
 
   const filteredMenu = menu.filter((item) => {
@@ -173,7 +123,12 @@ function Menu() {
           <p className="eyebrow">Today in the counter</p>
           <h2>Pick what fits your break.</h2>
         </div>
-        <button className="ghost-btn" onClick={fetchMenu} disabled={loading}>Refresh</button>
+        <div className="menu-head-actions">
+          <button className="ghost-btn" onClick={fetchMenu} disabled={loading}>Refresh</button>
+          <button className="primary-btn" type="button" onClick={() => navigate('/preorder-review')}>
+            Review pre-order ({draftCount})
+          </button>
+        </div>
       </div>
 
       <section className="menu-billboard" aria-label="Canteen highlights">
@@ -287,10 +242,10 @@ function Menu() {
                     <span className="menu-price">₹{item.price}</span>
                     <button
                       className="primary-btn"
-                      onClick={() => placeOrder(item)}
-                      disabled={!userId || placingId === item._id}
+                      onClick={() => addToPreorder(item)}
+                      disabled={!userId}
                     >
-                      {placingId === item._id ? 'Scheduling...' : 'Pre-order'}
+                      Add to pre-order
                     </button>
                   </div>
                 </article>

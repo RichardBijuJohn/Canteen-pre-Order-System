@@ -13,7 +13,11 @@ const defaultMenuForm = {
   available: true
 };
 
-const ORDER_STATUS_OPTIONS = [ 'Ready for Pickup', 'Picked'];
+const hasPickupTimeReached = (value) => {
+  const pickupMs = new Date(value).getTime();
+  if (Number.isNaN(pickupMs)) return false;
+  return pickupMs <= Date.now();
+};
 
 const formatPickupTime = (value) => {
   if (!value) return 'Awaiting slot';
@@ -401,7 +405,21 @@ function Admin() {
             const itemCount = order.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
             const statusKey = String(order.status || '').toLowerCase();
             const isPicked = statusKey.includes('picked');
-            const statusOptions = isPicked ? ['Picked'] : ORDER_STATUS_OPTIONS;
+            const isReady = statusKey.includes('ready');
+            const pickupReached = hasPickupTimeReached(order.pickupTime);
+
+            const statusOptions = (() => {
+              if (isPicked) return ['Picked'];
+              if (!pickupReached) return ['Pending'];
+              if (isReady) return ['Ready for Pickup', 'Picked'];
+              return ['Pending', 'Ready for Pickup'];
+            })();
+
+            const selectedStatus = statusOptions.includes(order.status)
+              ? order.status
+              : (statusOptions[0] || 'Pending');
+
+            const statusLocked = statusSavingId === order._id || isPicked || (!pickupReached && !statusKey.includes('pending'));
             return (
               <article key={order._id} className="admin-list-item order-admin-item">
                 <div className="order-admin-head">
@@ -412,9 +430,9 @@ function Admin() {
                   <div className="admin-status-controls">
                     <select
                       className="input-field"
-                      value={order.status || 'Pending'}
+                      value={selectedStatus}
                       onChange={(e) => updateOrderStatus(order._id, e.target.value)}
-                      disabled={statusSavingId === order._id || isPicked}
+                      disabled={statusLocked}
                     >
                       {statusOptions.map((status) => (
                         <option key={status} value={status}>{status}</option>
