@@ -8,6 +8,7 @@ import About from './pages/About';
 import Features from './pages/Features';
 import Admin from './pages/Admin';
 import PreorderReview from './pages/PreorderReview';
+import DemoPayment from './pages/DemoPayment';
 import Navbar from './components/Navbar';
 import './App.css';
 
@@ -26,6 +27,7 @@ function App() {
             <Route path="/features" element={<Features />} />
             <Route path="/menu" element={<Menu />} />
             <Route path="/preorder-review" element={<PreorderReview />} />
+            <Route path="/demo-payment/:sessionId" element={<DemoPayment />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/admin" element={<Admin />} />
           </Routes>
