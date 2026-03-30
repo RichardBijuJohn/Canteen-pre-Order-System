@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatOrderDisplayId } from '../utils/orderDisplayId';
 
 const formatPickupTime = (value) => {
   if (!value) return 'Awaiting slot';
@@ -18,9 +19,9 @@ const computeOrderState = (order, nowMs) => {
   const statusKey = (order.status || '').toLowerCase();
   if (statusKey.includes('picked')) return 'picked';
   if (statusKey.includes('cancel')) return 'cancelled';
-  const explicitDone = statusKey.includes('ready') || statusKey.includes('complete') || statusKey.includes('done');
-  const doneByTime = !Number.isNaN(pickupMs) && pickupMs <= nowMs;
-  return explicitDone || doneByTime ? 'done' : 'pending';
+  const explicitReady = statusKey.includes('ready') || statusKey.includes('complete') || statusKey.includes('done');
+  const readyByTime = !Number.isNaN(pickupMs) && pickupMs <= nowMs;
+  return explicitReady || readyByTime ? 'ready' : 'pending';
 };
 
 function Orders() {
@@ -77,7 +78,7 @@ function Orders() {
           const wasPicked = String(previousStatusMap[order._id] || '').toLowerCase().includes('picked');
           const isPicked = statusKey.includes('picked');
           if (!wasPicked && isPicked) {
-            const shortId = order._id ? order._id.slice(-5) : '00000';
+            const shortId = formatOrderDisplayId(order.orderCode || order._id);
             pickedMessage = `Order #${shortId} picked.`;
           }
         });
@@ -195,9 +196,11 @@ function Orders() {
     return safeA - safeB;
   });
   const pendingCount = normalizedOrders.filter((order) => computeOrderState(order, now) === 'pending').length;
-  const readyCount = normalizedOrders.length - pendingCount;
+  const readyCount = normalizedOrders.filter((order) => computeOrderState(order, now) === 'ready').length;
   const nextPickupOrder = normalizedOrders.find((order) => computeOrderState(order, now) === 'pending');
-  const nextPickupLabel = nextPickupOrder ? formatPickupTime(nextPickupOrder.pickupTime) : 'No pending pickups';
+  const nextPickupLabel = readyCount > 0
+    ? (readyCount === 1 ? 'Order ready for pickup' : `${readyCount} orders ready for pickup`)
+    : (nextPickupOrder ? formatPickupTime(nextPickupOrder.pickupTime) : 'No pending pickups');
 
   return (
     <section className="page-section">
@@ -258,7 +261,7 @@ function Orders() {
       {userId && !loading && !error && orders.length > 0 && (
         <div className="card-grid orders-grid">
           {normalizedOrders.map((order, index) => {
-            const shortId = order._id ? order._id.slice(-5) : '00000';
+            const shortId = formatOrderDisplayId(order.orderCode || order._id);
             const itemCount = order.items && order.items.length
               ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
               : 1;
@@ -268,7 +271,7 @@ function Orders() {
 
             const orderState = computeOrderState(order, now);
             const isPicked = orderState === 'picked';
-            const isReady = orderState === 'done';
+            const isReady = orderState === 'ready';
             const canReview = Boolean(order.pickedAt) || isPicked;
             const pickupLabel = formatPickupTime(order.pickupTime);
             return (
@@ -279,11 +282,8 @@ function Orders() {
                     <p className="order-time-hint">Placed for {pickupLabel}</p>
                   </div>
                   <span className={`status-chip ${isPicked ? 'picked' : (isReady ? 'ready' : statusTone(order.status))}`}>
-                    {isPicked ? 'Picked' : (isReady ? 'Done' : (order.status || 'Pending'))}
+                    {isPicked ? 'Picked' : (isReady ? 'Ready for Pickup' : (order.status || 'Pending'))}
                   </span>
-                  {isReady && !isPicked && (
-                    <span className="ready-badge">Ready for Pickup!</span>
-                  )}
                 </div>
                 <div className="order-amount">₹{(order.totalAmount || 0).toFixed(2)}</div>
                 <div className="order-meta">
@@ -294,6 +294,10 @@ function Orders() {
                   <div>
                     <p className="order-label">Items</p>
                     <p>{itemCount}</p>
+                  </div>
+                  <div>
+                    <p className="order-label">Mode of payment</p>
+                    <p>{order.paymentMode || 'Cash'}</p>
                   </div>
                 </div>
 

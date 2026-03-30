@@ -28,6 +28,7 @@ function Home() {
     loading: false,
     finalReadyTime: '',
     pendingCount: 0,
+    readyCount: 0,
     message: ''
   });
   const [quoteIndex, setQuoteIndex] = useState(0);
@@ -39,7 +40,7 @@ function Home() {
 
   const loadOrderInsight = async () => {
     if (!userId) {
-      setOrderInsight({ loading: false, finalReadyTime: '', pendingCount: 0, message: '' });
+      setOrderInsight({ loading: false, finalReadyTime: '', pendingCount: 0, readyCount: 0, message: '' });
       return;
     }
 
@@ -49,21 +50,38 @@ function Home() {
       const now = Date.now();
       const orders = Array.isArray(res.data) ? res.data : [];
 
-      const pendingOrders = orders.filter((order) => {
+      const activeOrders = orders.filter((order) => {
+        const statusKey = (order.status || '').toLowerCase();
+        const isPicked = statusKey.includes('picked');
+        const isCancelled = statusKey.includes('cancel');
+        return !isPicked && !isCancelled;
+      });
+
+      const readyOrders = activeOrders.filter((order) => {
+        const pickup = new Date(order.pickupTime).getTime();
+        const statusKey = (order.status || '').toLowerCase();
+        const markedReady = statusKey.includes('ready') || statusKey.includes('complete') || statusKey.includes('done');
+        const readyByTime = !Number.isNaN(pickup) && pickup <= now;
+        return markedReady || readyByTime;
+      });
+
+      const pendingOrders = activeOrders.filter((order) => {
         const pickup = new Date(order.pickupTime).getTime();
         if (Number.isNaN(pickup)) return false;
 
         const statusKey = (order.status || '').toLowerCase();
         const markedReady = statusKey.includes('ready') || statusKey.includes('complete') || statusKey.includes('done');
-        return pickup > now && !markedReady;
+        const readyByTime = pickup <= now;
+        return !markedReady && !readyByTime;
       });
 
-      if (!pendingOrders.length) {
+      if (!pendingOrders.length && !readyOrders.length) {
         setOrderInsight({
           loading: false,
           finalReadyTime: '',
           pendingCount: 0,
-          message: 'No active pending orders right now.'
+          readyCount: 0,
+          message: 'No active orders right now.'
         });
         return;
       }
@@ -75,13 +93,17 @@ function Home() {
         loading: false,
         finalReadyTime,
         pendingCount: pendingOrders.length,
-        message: `All your current orders should be ready by ${finalReadyTime}.`
+        readyCount: readyOrders.length,
+        message: readyOrders.length > 0
+          ? `${readyOrders.length} order${readyOrders.length > 1 ? 's are' : ' is'} ready for pickup.`
+          : `All your current orders should be ready by ${finalReadyTime}.`
       });
     } catch (err) {
       setOrderInsight({
         loading: false,
         finalReadyTime: '',
         pendingCount: 0,
+        readyCount: 0,
         message: 'Unable to load your pickup summary at the moment.'
       });
     }
@@ -240,6 +262,9 @@ function Home() {
             )}
             {!orderInsight.loading && orderInsight.pendingCount > 0 && (
               <p className="order-insight-count">Active pending orders: {orderInsight.pendingCount}</p>
+            )}
+            {!orderInsight.loading && orderInsight.readyCount > 0 && (
+              <p className="order-insight-time">Ready for pickup now: {orderInsight.readyCount}</p>
             )}
           </div>
         )}
