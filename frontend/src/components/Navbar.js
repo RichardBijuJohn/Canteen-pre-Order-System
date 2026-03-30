@@ -133,6 +133,29 @@ function Navbar() {
 
   const isAuthed = Boolean(userId);
 
+  const handleSectionLink = (e, sectionId) => {
+    e.preventDefault();
+
+    if (location.pathname !== '/') {
+      navigate(`/#${sectionId}`);
+      return;
+    }
+
+    const target = document.getElementById(sectionId);
+    if (!target) {
+      navigate(`/#${sectionId}`);
+      return;
+    }
+
+    const rootStyles = getComputedStyle(document.documentElement);
+    const scrollPaddingTop = Number.parseInt(rootStyles.scrollPaddingTop, 10) || 0;
+    const targetTop = target.getBoundingClientRect().top + window.scrollY - scrollPaddingTop;
+
+    window.history.replaceState(null, '', `/#${sectionId}`);
+    window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    window.dispatchEvent(new CustomEvent('home-section-change', { detail: { section: sectionId } }));
+  };
+
   return (
     <header className="nav-bar">
       <div className="nav-brand">
@@ -150,8 +173,22 @@ function Navbar() {
           }}
         />
         <NavLink to="/" className={`nav-link${activeKey === 'home' ? ' active' : ''}`} data-nav-key="home" end>Home</NavLink>
-        <Link to="/#about" className={`nav-link${activeKey === 'about' ? ' active' : ''}`} data-nav-key="about">About</Link>
-        <Link to="/#features" className={`nav-link${activeKey === 'features' ? ' active' : ''}`} data-nav-key="features">Features</Link>
+        <Link
+          to="/#about"
+          className={`nav-link${activeKey === 'about' ? ' active' : ''}`}
+          data-nav-key="about"
+          onClick={(e) => handleSectionLink(e, 'about')}
+        >
+          About
+        </Link>
+        <Link
+          to="/#features"
+          className={`nav-link${activeKey === 'features' ? ' active' : ''}`}
+          data-nav-key="features"
+          onClick={(e) => handleSectionLink(e, 'features')}
+        >
+          Features
+        </Link>
         <NavLink to="/login" className={`nav-link${activeKey === 'login' ? ' active' : ''}`} data-nav-key="login">Login</NavLink>
         {!isAdminRoute && (
           <NavLink to="/menu" className={`nav-link${activeKey === 'menu' ? ' active' : ''}`} data-nav-key="menu" onClick={e => handleProtectedNav(e, '/menu')}>Menu</NavLink>

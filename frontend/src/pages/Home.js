@@ -35,6 +35,7 @@ function Home() {
   const highlightRef = useRef(null);
   const aboutRef = useRef(null);
   const featuresRef = useRef(null);
+  const activeSectionRef = useRef('home');
 
   const loadOrderInsight = async () => {
     if (!userId) {
@@ -116,15 +117,24 @@ function Home() {
     if (!sections.length) return;
 
     const ratios = new Map();
-    const emit = (section) => {
+    const emit = (section, force = false) => {
+      if (!force && activeSectionRef.current === section) {
+        return;
+      }
+
+      activeSectionRef.current = section;
       window.dispatchEvent(new CustomEvent('home-section-change', { detail: { section } }));
     };
+
+    const rootStyles = getComputedStyle(document.documentElement);
+    const headerOffset = Number.parseInt(rootStyles.scrollPaddingTop, 10) || 0;
+    const rootMarginTop = -(headerOffset + 8);
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         const key = entry.target.getAttribute('data-home-section');
         if (key) {
-          ratios.set(key, entry.intersectionRatio);
+          ratios.set(key, entry.isIntersecting ? entry.intersectionRatio : 0);
         }
       });
 
@@ -137,11 +147,28 @@ function Home() {
         }
       });
 
+      if (best < 0.1) {
+        let nearestDistance = Number.POSITIVE_INFINITY;
+        sections.forEach((section) => {
+          const key = section.getAttribute('data-home-section');
+          if (!key) return;
+
+          const distance = Math.abs(section.getBoundingClientRect().top - headerOffset - 24);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            current = key;
+          }
+        });
+      }
+
       emit(current);
-    }, { threshold: [0.2, 0.4, 0.6, 0.8] });
+    }, {
+      rootMargin: `${rootMarginTop}px 0px -45% 0px`,
+      threshold: [0, 0.15, 0.35, 0.6]
+    });
 
     sections.forEach((section) => observer.observe(section));
-    emit(location.hash === '#about' ? 'about' : location.hash === '#features' ? 'features' : 'home');
+    emit(location.hash === '#about' ? 'about' : location.hash === '#features' ? 'features' : 'home', true);
 
     return () => {
       observer.disconnect();

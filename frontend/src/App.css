@@ -317,6 +317,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  --header-scroll-offset: 118px;
 }
 
 .page-shell {
@@ -390,7 +391,8 @@
   border-radius: 999px;
   background: var(--primary);
   box-shadow: 0 8px 20px rgba(255, 123, 95, 0.35);
-  transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), width 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+  will-change: transform, width;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), width 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
   z-index: 0;
 }
 
@@ -1292,11 +1294,12 @@
 }
 
 .admin-card {
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 16px 40px -10px rgba(15, 23, 42, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 .admin-card h3 {
@@ -1397,10 +1400,19 @@
 }
 
 .admin-list-item {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 14px;
-  padding: 12px;
-  background: rgba(248, 250, 252, 0.8);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.05);
+}
+
+.admin-list-item:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.1);
 }
 
 .admin-item-grid {
@@ -1498,6 +1510,14 @@
 }
 
 @media (max-width: 600px) {
+  .app-shell {
+    --header-scroll-offset: 168px;
+  }
+
+  html {
+    scroll-padding-top: 168px;
+  }
+
   .nav-bar {
     flex-direction: column;
     align-items: flex-start;
@@ -1597,7 +1617,13 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
-  scroll-margin-top: 28px;
+  scroll-margin-top: var(--header-scroll-offset);
+}
+
+.public-home-hero,
+.home-highlight-grid,
+.home-stack-section {
+  scroll-margin-top: var(--header-scroll-offset);
 }
 
 .section-band {
@@ -1780,6 +1806,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 118px;
 }
 
 @keyframes bounce-down {
