@@ -167,6 +167,12 @@ function Login() {
             />
           </label>
 
+          {isLogin && (
+            <button className="link-btn" type="button" onClick={() => navigate('/forgot-password')}>
+              Forgot password?
+            </button>
+          )}
+
           <button className="primary-btn" type="submit" disabled={submitting}>
             {submitting ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
           </button>
