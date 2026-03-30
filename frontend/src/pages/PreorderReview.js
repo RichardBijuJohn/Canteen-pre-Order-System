@@ -12,10 +12,11 @@ import {
 
 const WORKING_HOURS = {
   startMinutes: 8 * 60,
-  endMinutes: 17 * 60
+  endMinutes: 20 * 60
 };
 
-const WORKING_HOURS_LABEL = '8:00 AM - 5:00 PM';
+const WORKING_HOURS_LABEL = '8:00 AM - 8:00 PM';
+const PUBLIC_BASE_URL = (process.env.REACT_APP_PUBLIC_BASE_URL || '').trim();
 
 const isWithinWorkingHours = () => {
   const now = new Date();
@@ -26,6 +27,10 @@ const isWithinWorkingHours = () => {
 function PreorderReview() {
   const [items, setItems] = useState([]);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentSessionId, setPaymentSessionId] = useState('');
+  const [paymentState, setPaymentState] = useState('idle');
+  const [paymentAmount, setPaymentAmount] = useState(0);
   const [banner, setBanner] = useState({ type: '', message: '' });
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
@@ -55,6 +60,35 @@ function PreorderReview() {
     const timer = setTimeout(() => setBanner({ type: '', message: '' }), 2800);
     return () => clearTimeout(timer);
   }, [banner]);
+
+  useEffect(() => {
+    if (!paymentSessionId || !showPaymentModal) return undefined;
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await axios.get(`/api/orders/payment-session/${paymentSessionId}`);
+        const state = res.data?.state || 'pending';
+        setPaymentState(state);
+        if (state === 'ordered') {
+          clearInterval(poll);
+          clearPreorderDraft();
+          setItems([]);
+          setShowPaymentModal(false);
+          setBanner({ type: 'success', message: 'Payment complete. Order placed successfully.' });
+          setTimeout(() => navigate('/orders'), 600);
+        }
+      } catch (err) {
+        const message = err.response?.data?.msg || 'Payment session expired. Please try again.';
+        setBanner({ type: 'error', message });
+        clearInterval(poll);
+        setShowPaymentModal(false);
+        setPaymentSessionId('');
+        setPaymentState('idle');
+      }
+    }, 2000);
+
+    return () => clearInterval(poll);
+  }, [paymentSessionId, showPaymentModal, navigate]);
 
   const handleQuantityChange = (itemId, value) => {
     const result = updatePreorderDraftQuantity(itemId, value);
@@ -98,7 +132,7 @@ function PreorderReview() {
     setBanner({ type: '', message: '' });
 
     try {
-      await axios.post('http://localhost:5000/api/orders/place', {
+      const payload = {
         userId,
         items: items.map((item) => ({
           _id: item._id,
@@ -108,12 +142,13 @@ function PreorderReview() {
           preparationTime: item.preparationTime
         })),
         totalAmount
-      });
+      };
 
-      clearPreorderDraft();
-      setItems([]);
-      setBanner({ type: 'success', message: 'Order placed successfully.' });
-      setTimeout(() => navigate('/orders'), 700);
+      const res = await axios.post('/api/orders/payment-session/create', payload);
+      setPaymentSessionId(res.data?.sessionId || '');
+      setPaymentAmount(Number(res.data?.totalAmount || totalAmount || 0));
+      setPaymentState(res.data?.state || 'pending');
+      setShowPaymentModal(true);
     } catch (err) {
       if (err.response?.status === 401) {
         setBanner({ type: 'error', message: 'Session expired. Please sign in again.' });
@@ -121,12 +156,24 @@ function PreorderReview() {
       } else if (err.response?.status === 403) {
         setBanner({ type: 'error', message: err.response?.data?.msg || `Orders are open only between ${WORKING_HOURS_LABEL}.` });
       } else {
-        setBanner({ type: 'error', message: 'Could not place order right now. Please try again.' });
+        setBanner({ type: 'error', message: err.response?.data?.msg || 'Could not start payment right now. Please try again.' });
       }
     } finally {
       setPlacingOrder(false);
     }
   };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+  };
+
+  const appBaseUrl = PUBLIC_BASE_URL || window.location.origin;
+  const paymentUrl = paymentSessionId
+    ? `${appBaseUrl}/demo-payment/${paymentSessionId}`
+    : '';
+  const qrCodeSrc = paymentUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(paymentUrl)}`
+    : '';
 
   return (
     <section className="page-section">
@@ -198,11 +245,34 @@ function PreorderReview() {
                 Clear list
               </button>
               <button className="primary-btn" type="button" onClick={handleFinalizeOrder} disabled={placingOrder}>
-                {placingOrder ? 'Placing order...' : 'Place order'}
+                {placingOrder ? 'Starting payment...' : 'Place order'}
               </button>
             </div>
           </div>
         </>
+      )}
+
+      {showPaymentModal && (
+        <div className="payment-modal-backdrop" role="dialog" aria-modal="true" aria-label="Scan QR for demo payment">
+          <div className="payment-modal-card">
+            <p className="eyebrow">Demo online payment</p>
+            <h3>Scan this QR on your phone</h3>
+            <p className="order-item-meta">After payment is completed on phone, your order will be placed automatically.</p>
+            <p className="demo-payment-amount">Amount: ₹{paymentAmount.toFixed(2)}</p>
+
+            {qrCodeSrc && <img className="payment-qr-image" src={qrCodeSrc} alt="QR code for demo payment" />}
+
+            <p className="payment-modal-status">Status: {paymentState === 'ordered' ? 'Order placed' : paymentState === 'processing' ? 'Processing payment' : 'Waiting for payment'}</p>
+            {window.location.hostname === 'localhost' && !PUBLIC_BASE_URL && (
+              <p className="order-item-meta">Tip: open this app from your PC network IP (not localhost) for phone scanning.</p>
+            )}
+
+            <div className="payment-modal-actions">
+              <a className="ghost-btn" href={paymentUrl} target="_blank" rel="noreferrer">Open payment page</a>
+              <button className="ghost-btn" type="button" onClick={handleClosePaymentModal}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

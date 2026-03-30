@@ -1,4 +1,7 @@
 {
+   "scripts": {
+  "start": "node server.js"
+   },
   "name": "canteen-preorder",
   "version": "1.0.0",
   "description": "",
@@ -18,4 +21,6 @@
     "mongoose": "^9.3.1",
     "react-router-dom": "^7.13.1"
   }
+ 
 }
+
