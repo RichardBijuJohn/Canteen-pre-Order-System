@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatOrderDisplayId } from '../utils/orderDisplayId';
 
-const ADMIN_API = 'http://localhost:5000/api/admin';
+const ADMIN_API = '/api/admin';
 
 const defaultMenuForm = {
   name: '',
