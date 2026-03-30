@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Menu from './pages/Menu';
 import Orders from './pages/Orders';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
 import About from './pages/About';
 import Features from './pages/Features';
@@ -20,6 +21,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/about" element={<About />} />
             <Route path="/features" element={<Features />} />
             <Route path="/menu" element={<Menu />} />
