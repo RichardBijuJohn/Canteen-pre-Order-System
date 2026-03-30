@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const MenuItem = require('../models/MenuItem');
 const Order = require('../models/Order');
+const { generateUniqueOrderCode } = require('../utils/orderCode');
 
 const router = express.Router();
 
@@ -216,11 +217,21 @@ router.get('/orders', requireAdmin, async (_req, res) => {
     const orders = await Order.find().sort({ _id: -1 });
 
     await Promise.all(orders.map(async (order) => {
+      let shouldSave = false;
+
+      if (!order.orderCode) {
+        order.orderCode = await generateUniqueOrderCode(Order);
+        shouldSave = true;
+      }
+
       const statusKey = String(order.status || '').toLowerCase();
       const isPicked = statusKey.includes('picked');
       const isCancelled = statusKey.includes('cancel');
 
       if (isPicked || isCancelled) {
+        if (shouldSave) {
+          await order.save();
+        }
         return;
       }
 
@@ -232,7 +243,10 @@ router.get('/orders', requireAdmin, async (_req, res) => {
           const base = typeof item.toObject === 'function' ? item.toObject() : item;
           return { ...base, status: 'Done' };
         });
-        await order.save();
+        shouldSave = true;
+        if (shouldSave) {
+          await order.save();
+        }
         return;
       }
 
@@ -242,6 +256,10 @@ router.get('/orders', requireAdmin, async (_req, res) => {
           const base = typeof item.toObject === 'function' ? item.toObject() : item;
           return { ...base, status: 'Pending' };
         });
+        shouldSave = true;
+      }
+
+      if (shouldSave) {
         await order.save();
       }
     }));

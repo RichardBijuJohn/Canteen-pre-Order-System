@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
+const { generateUniqueOrderCode } = require('../utils/orderCode');
 
 const WORKING_HOURS = {
     startMinutes: 8 * 60, // 8:00 AM
@@ -36,6 +37,7 @@ const computePickupIso = (minutes = 15) => {
 // Place order (requires logged in user)
 router.post('/place', async (req, res) => {
     const { userId, items = [], pickupTime, status } = req.body;
+    const paymentMode = 'Cash';
 
     if (!userId) {
         return res.status(401).json({ msg: 'Login required to place orders.' });
@@ -64,9 +66,11 @@ router.post('/place', async (req, res) => {
         const totalAmount = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
         const orderData = {
+            orderCode: await generateUniqueOrderCode(Order),
             userId,
             items: normalizedItems,
             totalAmount,
+            paymentMode,
             pickupTime: pickupTime || computePickupIso(longestPrep || 15)
         };
 
@@ -76,7 +80,7 @@ router.post('/place', async (req, res) => {
 
         const order = new Order(orderData);
         await order.save();
-        res.json({ msg: 'Order placed' });
+        res.json({ msg: 'Order placed', orderCode: order.orderCode, orderId: order._id });
     } catch (err) {
         console.error(err);
         res.status(500).json({ msg: 'Unable to place order right now.' });
@@ -95,12 +99,32 @@ router.get('/:userId', async (req, res) => {
         const orders = await Order.find({ userId });
 
         await Promise.all(orders.map(async (order) => {
-            if (!order.pickupTime) return;
+            let shouldSave = false;
+
+            if (!order.orderCode) {
+                order.orderCode = await generateUniqueOrderCode(Order);
+                shouldSave = true;
+            }
+
+            if (!order.pickupTime) {
+                if (shouldSave) {
+                    await order.save();
+                }
+                return;
+            }
             const pickupDate = new Date(order.pickupTime);
-            if (Number.isNaN(pickupDate.getTime())) return;
+            if (Number.isNaN(pickupDate.getTime())) {
+                if (shouldSave) {
+                    await order.save();
+                }
+                return;
+            }
 
             const statusKey = (order.status || '').toLowerCase();
             if (statusKey.includes('picked') || statusKey.includes('cancel')) {
+                if (shouldSave) {
+                    await order.save();
+                }
                 return;
             }
 
@@ -112,6 +136,10 @@ router.get('/:userId', async (req, res) => {
                     const base = typeof item.toObject === 'function' ? item.toObject() : item;
                     return { ...base, status: 'Done' };
                 });
+                shouldSave = true;
+            }
+
+            if (shouldSave) {
                 await order.save();
             }
         }));
