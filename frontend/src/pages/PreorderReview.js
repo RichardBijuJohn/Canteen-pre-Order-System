@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  MAX_PREORDER_TOTAL_QUANTITY,
   calculatePreorderTotal,
   clearPreorderDraft,
   getPreorderDraftItems,
@@ -56,8 +57,14 @@ function PreorderReview() {
   }, [banner]);
 
   const handleQuantityChange = (itemId, value) => {
-    updatePreorderDraftQuantity(itemId, value);
+    const result = updatePreorderDraftQuantity(itemId, value);
     setItems(getPreorderDraftItems());
+    if (result.capped) {
+      setBanner({
+        type: 'error',
+        message: `Order limit is ${MAX_PREORDER_TOTAL_QUANTITY} total items.`
+      });
+    }
   };
 
   const handleRemove = (itemId) => {
@@ -165,6 +172,7 @@ function PreorderReview() {
                       <input
                         type="number"
                         min="1"
+                        max={MAX_PREORDER_TOTAL_QUANTITY}
                         className="quantity-input"
                         value={quantity}
                         onChange={(e) => handleQuantityChange(item._id, e.target.value)}
@@ -183,6 +191,7 @@ function PreorderReview() {
           <div className="preorder-summary-card">
             <p className="order-label">Total amount</p>
             <p className="preorder-total">₹{totalAmount.toFixed(2)}</p>
+            <p className="order-item-meta"></p>
 
             <div className="preorder-summary-actions">
               <button className="ghost-btn" type="button" onClick={handleClear} disabled={placingOrder}>
