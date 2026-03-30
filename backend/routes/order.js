@@ -5,10 +5,10 @@ const { generateUniqueOrderCode } = require('../utils/orderCode');
 
 const WORKING_HOURS = {
     startMinutes: 8 * 60, // 8:00 AM
-    endMinutes: 22 * 60 // 10:00 PM
+    endMinutes: 17 * 60 // 5:00 PM
 };
 
-const WORKING_HOURS_LABEL = '8:00 AM - 10:00 PM';
+const WORKING_HOURS_LABEL = '8:00 AM - 5:00 PM';
 
 const isWithinWorkingHours = () => {
     const now = new Date();

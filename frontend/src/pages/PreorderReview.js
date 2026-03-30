@@ -11,10 +11,10 @@ import {
 
 const WORKING_HOURS = {
   startMinutes: 8 * 60,
-  endMinutes: 22 * 60
+  endMinutes: 17 * 60
 };
 
-const WORKING_HOURS_LABEL = '8:00 AM - 10:00 PM';
+const WORKING_HOURS_LABEL = '8:00 AM - 5:00 PM';
 
 const isWithinWorkingHours = () => {
   const now = new Date();
