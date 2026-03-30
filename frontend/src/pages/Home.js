@@ -46,7 +46,7 @@ function Home() {
 
     setOrderInsight((prev) => ({ ...prev, loading: true }));
     try {
-      const res = await axios.get(`http://localhost:5000/api/orders/${userId}`);
+      const res = await axios.get(`/api/orders/${userId}`);
       const now = Date.now();
       const orders = Array.isArray(res.data) ? res.data : [];
 

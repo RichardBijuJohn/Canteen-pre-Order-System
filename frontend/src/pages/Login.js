@@ -39,7 +39,7 @@ function Login() {
           return;
         }
 
-        const registerRes = await axios.post('http://localhost:5000/api/auth/register', {
+        const registerRes = await axios.post('/api/auth/register', {
           name: (formData.email.split('@')[0] || 'Student').slice(0, 30),
           email: formData.email,
           password: formData.password
@@ -55,7 +55,7 @@ function Login() {
         return;
       }
 
-      const adminRes = await axios.post('http://localhost:5000/api/admin/login', {
+      const adminRes = await axios.post('/api/admin/login', {
         email: formData.email,
         password: formData.password
       }).catch(() => null);
@@ -70,7 +70,7 @@ function Login() {
         return;
       }
 
-      const res = await axios.post('http://localhost:5000/api/auth/login', {
+      const res = await axios.post('/api/auth/login', {
         email: formData.email,
         password: formData.password
       });
