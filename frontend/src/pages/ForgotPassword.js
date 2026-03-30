@@ -16,7 +16,7 @@ function ForgotPassword() {
     setStatus({ type: '', message: '' });
 
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/forgot-password', { email });
+      const res = await axios.post('/api/auth/forgot-password', { email });
       setStatus({ type: 'success', message: res.data?.msg || 'Reset token generated.' });
       if (res.data?.resetToken) {
         setToken(res.data.resetToken);
@@ -34,7 +34,7 @@ function ForgotPassword() {
     setStatus({ type: '', message: '' });
 
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/reset-password', {
+      const res = await axios.post('/api/auth/reset-password', {
         token,
         newPassword
       });

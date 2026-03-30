@@ -42,7 +42,7 @@ function Menu() {
   const fetchMenu = () => {
     setLoading(true);
     setError('');
-    axios.get('http://localhost:5000/api/menu')
+    axios.get('/api/menu')
       .then(res => setMenu(res.data))
       .catch(() => setError('Unable to load menu right now.'))
       .finally(() => setLoading(false));
