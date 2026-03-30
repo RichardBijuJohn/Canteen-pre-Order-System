@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatOrderDisplayId } from '../utils/orderDisplayId';
 
 const ADMIN_API = 'http://localhost:5000/api/admin';
 
@@ -28,6 +29,14 @@ const formatPickupTime = (value) => {
   return `${time} · ${day}`;
 };
 
+const adminStatusTone = (status = '') => {
+  const key = String(status).toLowerCase();
+  if (key.includes('picked')) return 'picked';
+  if (key.includes('ready')) return 'ready';
+  if (key.includes('cancel')) return 'cancelled';
+  return 'pending';
+};
+
 function Admin() {
   const navigate = useNavigate();
   const [token, setToken] = useState(localStorage.getItem('adminToken') || '');
@@ -42,6 +51,7 @@ function Admin() {
   const [statusSavingId, setStatusSavingId] = useState('');
   const [loadingData, setLoadingData] = useState(false);
   const [orderFilter, setOrderFilter] = useState('all');
+  const [orderQuery, setOrderQuery] = useState('');
   const [menuQuery, setMenuQuery] = useState('');
   const [menuCategory, setMenuCategory] = useState('All');
   const [menuVisibleCount, setMenuVisibleCount] = useState(6);
@@ -132,9 +142,28 @@ function Admin() {
   }, [orders, menuItems.length]);
 
   const filteredOrders = useMemo(() => {
-    if (orderFilter === 'all') return orders;
-    return orders.filter((order) => String(order.status || '').toLowerCase().includes(orderFilter));
-  }, [orders, orderFilter]);
+    const query = orderQuery.trim().toLowerCase();
+
+    return orders
+      .filter((order) => {
+        if (orderFilter === 'all') return true;
+        return String(order.status || '').toLowerCase().includes(orderFilter);
+      })
+      .filter((order) => {
+        if (!query) return true;
+        const shortId = formatOrderDisplayId(order.orderCode || order._id).toLowerCase();
+        const user = String(order.userId || '').toLowerCase();
+        const status = String(order.status || '').toLowerCase();
+        return shortId.includes(query) || user.includes(query) || status.includes(query);
+      })
+      .sort((a, b) => {
+        const aMs = new Date(a.pickupTime).getTime();
+        const bMs = new Date(b.pickupTime).getTime();
+        const safeA = Number.isNaN(aMs) ? 0 : aMs;
+        const safeB = Number.isNaN(bMs) ? 0 : bMs;
+        return safeA - safeB;
+      });
+  }, [orders, orderFilter, orderQuery]);
 
   const menuCategories = useMemo(() => {
     const categories = menuItems.map((item) => item.category).filter(Boolean);
@@ -241,11 +270,11 @@ function Admin() {
   }
 
   return (
-    <section className="page-section admin-shell">
-      <div className="section-heading">
-        <div>
+    <section className="page-section admin-shell admin-shell-redesign">
+      <div className="admin-topbar">
+        <div className="admin-head-copy">
           <p className="eyebrow">Admin Dashboard</p>
-          <h2>Manage menu and user orders.</h2>
+          <h2>Control center for menu and order flow.</h2>
           <p className="subtitle admin-subtitle">Signed in as {adminName}</p>
         </div>
         <div className="admin-actions">
@@ -258,36 +287,39 @@ function Admin() {
         <div className={`inline-banner ${banner.type === 'error' ? 'error' : 'success'}`}>{banner.message}</div>
       )}
 
-      <section className="admin-overview-grid">
-        <article className="admin-overview-card">
+      <section className="admin-overview-grid admin-overview-grid-redesign">
+        <article className="admin-overview-card admin-kpi-card">
           <p className="order-label">Menu Items</p>
           <p className="order-summary-value">{orderMetrics.menuCount}</p>
         </article>
-        <article className="admin-overview-card">
+        <article className="admin-overview-card admin-kpi-card">
           <p className="order-label">Total Orders</p>
           <p className="order-summary-value">{orderMetrics.totalOrders}</p>
         </article>
-        <article className="admin-overview-card">
+        <article className="admin-overview-card admin-kpi-card">
           <p className="order-label">Pending</p>
           <p className="order-summary-value">{orderMetrics.pending}</p>
         </article>
-        <article className="admin-overview-card">
+        <article className="admin-overview-card admin-kpi-card">
           <p className="order-label">Ready</p>
           <p className="order-summary-value">{orderMetrics.ready}</p>
         </article>
-        <article className="admin-overview-card">
+        <article className="admin-overview-card admin-kpi-card">
           <p className="order-label">Picked</p>
           <p className="order-summary-value">{orderMetrics.picked}</p>
         </article>
-        <article className="admin-overview-card">
+        <article className="admin-overview-card admin-kpi-card admin-kpi-revenue">
           <p className="order-label">Revenue</p>
           <p className="order-summary-value">Rs {orderMetrics.revenue.toFixed(2)}</p>
         </article>
       </section>
 
-      <div className="admin-grid">
+      <div className="admin-grid admin-grid-redesign">
         <section className="admin-card">
-          <h3>Add Menu Item</h3>
+          <div className="admin-card-head">
+            <h3>Add Menu Item</h3>
+            <p>Create new dishes quickly for the live menu.</p>
+          </div>
           <form className="admin-form" onSubmit={addMenuItem}>
             <input className="input-field" placeholder="Name" value={menuForm.name} onChange={(e) => setMenuForm((prev) => ({ ...prev, name: e.target.value }))} required />
             <input className="input-field" placeholder="Price" type="number" min="1" value={menuForm.price} onChange={(e) => setMenuForm((prev) => ({ ...prev, price: e.target.value }))} required />
@@ -303,7 +335,10 @@ function Admin() {
         </section>
 
         <section className="admin-card">
-          <h3>Menu Inventory</h3>
+          <div className="admin-card-head">
+            <h3>Menu Inventory</h3>
+            <p>Search, filter, edit, and clean up items.</p>
+          </div>
           <div className="admin-menu-toolbar">
             <input
               className="input-field admin-menu-search"
@@ -392,21 +427,39 @@ function Admin() {
 
       <section className="admin-card admin-orders-card">
         <div className="admin-orders-head">
-          <h3>User Orders</h3>
-          <div className="admin-filter-tabs">
-            <button className={`ghost-btn${orderFilter === 'all' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('all')} type="button">All</button>
-            <button className={`ghost-btn${orderFilter === 'pending' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('pending')} type="button">Pending</button>
-            <button className={`ghost-btn${orderFilter === 'ready' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('ready')} type="button">Ready</button>
-            <button className={`ghost-btn${orderFilter === 'picked' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('picked')} type="button">Picked</button>
+          <div className="admin-card-head">
+            <h3>User Orders</h3>
+            <p>Track incoming pickups and update state in sequence.</p>
+          </div>
+          <div className="admin-orders-toolbar">
+            <input
+              className="input-field admin-order-search"
+              placeholder="Search by order ID, user, or status"
+              value={orderQuery}
+              onChange={(e) => setOrderQuery(e.target.value)}
+            />
+            <div className="admin-filter-tabs">
+              <button className={`ghost-btn${orderFilter === 'all' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('all')} type="button">All</button>
+              <button className={`ghost-btn${orderFilter === 'pending' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('pending')} type="button">Pending</button>
+              <button className={`ghost-btn${orderFilter === 'ready' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('ready')} type="button">Ready</button>
+              <button className={`ghost-btn${orderFilter === 'picked' ? ' active-tab' : ''}`} onClick={() => setOrderFilter('picked')} type="button">Picked</button>
+            </div>
           </div>
         </div>
+        <p className="admin-orders-count">Showing {filteredOrders.length} orders</p>
         <div className="admin-list">
           {filteredOrders.map((order) => {
             const itemCount = order.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
+            const itemPreview = (order.items || [])
+              .slice(0, 2)
+              .map((item) => item?.name)
+              .filter(Boolean)
+              .join(', ');
             const statusKey = String(order.status || '').toLowerCase();
             const isPicked = statusKey.includes('picked');
             const isReady = statusKey.includes('ready');
             const pickupReached = hasPickupTimeReached(order.pickupTime);
+            const tone = adminStatusTone(order.status);
 
             const statusOptions = (() => {
               if (isPicked) return ['Picked'];
@@ -424,10 +477,12 @@ function Admin() {
               <article key={order._id} className="admin-list-item order-admin-item">
                 <div className="order-admin-head">
                   <div>
-                    <p className="order-id">Order #{order._id?.slice(-6)}</p>
+                    <p className="order-id">Order #{formatOrderDisplayId(order.orderCode || order._id)}</p>
                     <p className="order-time-hint">User: {order.userId}</p>
+                    {itemPreview && <p className="admin-order-preview">Items: {itemPreview}</p>}
                   </div>
                   <div className="admin-status-controls">
+                    <span className={`admin-status-pill ${tone}`}>{order.status || 'Pending'}</span>
                     <select
                       className="input-field"
                       value={selectedStatus}
@@ -438,6 +493,9 @@ function Admin() {
                         <option key={status} value={status}>{status}</option>
                       ))}
                     </select>
+                    {!pickupReached && !isPicked && (
+                      <p className="admin-status-hint">Status unlocks at pickup time.</p>
+                    )}
                   </div>
                 </div>
                 <div className="order-meta">

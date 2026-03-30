@@ -1533,6 +1533,129 @@
   min-width: 190px;
 }
 
+.admin-shell-redesign {
+  background: radial-gradient(circle at top right, rgba(255, 228, 198, 0.35), transparent 45%), linear-gradient(180deg, #f7fbff 0%, #fdf8f2 100%);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.admin-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.admin-head-copy h2 {
+  margin: 4px 0 0;
+}
+
+.admin-overview-grid-redesign {
+  gap: 12px;
+}
+
+.admin-kpi-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.98), rgba(244, 249, 255, 0.95));
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+}
+
+.admin-kpi-revenue {
+  background: linear-gradient(150deg, rgba(255, 247, 230, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.admin-grid-redesign {
+  align-items: start;
+}
+
+.admin-card-head {
+  margin-bottom: 14px;
+}
+
+.admin-card-head h3 {
+  margin: 0;
+}
+
+.admin-card-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.admin-orders-toolbar {
+  display: grid;
+  gap: 10px;
+  width: min(680px, 100%);
+}
+
+.admin-order-search {
+  width: 100%;
+}
+
+.admin-orders-count {
+  margin: 2px 0 12px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.order-admin-item {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.admin-order-preview {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.admin-status-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.admin-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-status-pill.pending {
+  background: rgba(255, 179, 71, 0.2);
+  color: #8a4b02;
+}
+
+.admin-status-pill.ready {
+  background: rgba(102, 187, 106, 0.2);
+  color: #1f6b28;
+}
+
+.admin-status-pill.picked {
+  background: rgba(31, 111, 235, 0.16);
+  color: #0f4a9b;
+}
+
+.admin-status-pill.cancelled {
+  background: rgba(229, 57, 53, 0.16);
+  color: #a2201d;
+}
+
+.admin-status-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .quantity-card-anim {
   animation: pop-in 0.4s cubic-bezier(.4,2,.3,1);
 }

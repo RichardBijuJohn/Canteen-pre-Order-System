@@ -25,7 +25,6 @@ const isWithinWorkingHours = () => {
 function PreorderReview() {
   const [items, setItems] = useState([]);
   const [placingOrder, setPlacingOrder] = useState(false);
-  const [paymentMode, setPaymentMode] = useState('');
   const [banner, setBanner] = useState({ type: '', message: '' });
   const userId = localStorage.getItem('userId');
   const navigate = useNavigate();
@@ -83,11 +82,6 @@ function PreorderReview() {
       return;
     }
 
-    if (!paymentMode) {
-      setBanner({ type: 'error', message: 'Please select a payment mode before placing the order.' });
-      return;
-    }
-
     if (!isWithinWorkingHours()) {
       setBanner({ type: 'error', message: `Orders can be finalized only between ${WORKING_HOURS_LABEL}.` });
       return;
@@ -99,7 +93,6 @@ function PreorderReview() {
     try {
       await axios.post('http://localhost:5000/api/orders/place', {
         userId,
-        paymentMode,
         items: items.map((item) => ({
           _id: item._id,
           name: item.name,
@@ -190,44 +183,6 @@ function PreorderReview() {
           <div className="preorder-summary-card">
             <p className="order-label">Total amount</p>
             <p className="preorder-total">₹{totalAmount.toFixed(2)}</p>
-
-            <div className="preorder-payment-panel">
-              <p className="order-label">Mode of payment</p>
-              <div className="preorder-payment-options">
-                <label className={`preorder-pay-option${paymentMode === 'Cash' ? ' active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="paymentMode"
-                    value="Cash"
-                    checked={paymentMode === 'Cash'}
-                    onChange={(e) => setPaymentMode(e.target.value)}
-                  />
-                  Cash
-                </label>
-                <label className={`preorder-pay-option${paymentMode === 'Online' ? ' active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="paymentMode"
-                    value="Online"
-                    checked={paymentMode === 'Online'}
-                    onChange={(e) => setPaymentMode(e.target.value)}
-                  />
-                  Online
-                </label>
-              </div>
-
-              {paymentMode === 'Online' && (
-                <div className="preorder-qr-box">
-                  <p className="preorder-qr-title">Scan demo QR for online payment</p>
-                  <img
-                    className="preorder-qr-image"
-                    src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=demo-online-payment-canteen-ahead"
-                    alt="Demo online payment QR"
-                  />
-                  <p className="preorder-qr-note">This is a demo QR for UI flow.</p>
-                </div>
-              )}
-            </div>
 
             <div className="preorder-summary-actions">
               <button className="ghost-btn" type="button" onClick={handleClear} disabled={placingOrder}>
