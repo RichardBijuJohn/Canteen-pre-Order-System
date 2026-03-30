@@ -9,6 +9,7 @@ const WORKING_HOURS = {
 };
 
 const WORKING_HOURS_LABEL = '8:00 AM - 5:00 PM';
+const MAX_ORDER_TOTAL_QUANTITY = 8;
 
 const isWithinWorkingHours = () => {
     const now = new Date();
@@ -53,7 +54,7 @@ router.post('/place', async (req, res) => {
             const prepMinutes = parsePrepMinutes(item && item.preparationTime);
             longestPrep = Math.max(longestPrep, prepMinutes);
             const rawQuantity = Number(item && item.quantity);
-            const quantity = rawQuantity > 0 ? rawQuantity : 1;
+            const quantity = rawQuantity > 0 ? Math.floor(rawQuantity) : 1;
             return {
                 name: item && item.name,
                 price: Number(item && item.price) || 0,
@@ -64,6 +65,13 @@ router.post('/place', async (req, res) => {
         }) : [];
 
         const totalAmount = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const totalQuantity = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
+
+        if (totalQuantity > MAX_ORDER_TOTAL_QUANTITY) {
+            return res.status(400).json({
+                msg: `Order limit is ${MAX_ORDER_TOTAL_QUANTITY} total items.`
+            });
+        }
 
         const orderData = {
             orderCode: await generateUniqueOrderCode(Order),

@@ -873,6 +873,12 @@
   align-items: center;
 }
 
+.menu-add-btn {
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  border-radius: 10px;
+}
+
 .menu-price {
   font-size: 1.5rem;
   font-weight: 600;
@@ -1370,6 +1376,12 @@
   transform: translateY(-2px);
   background: linear-gradient(90deg, var(--primary) 60%, #ffb74d 100%);
   box-shadow: 0 8px 24px rgba(255, 123, 95, 0.25);
+}
+
+.primary-btn.menu-add-btn {
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  border-radius: 10px;
 }
 
 .ghost-btn:hover:not(:disabled) {
