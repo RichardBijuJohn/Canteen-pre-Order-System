@@ -67,7 +67,7 @@ function Orders() {
       setLoading(true);
       setError('');
     }
-    axios.get(`http://localhost:5000/api/orders/${id}`)
+    axios.get(`/api/orders/${id}`)
       .then(res => {
         const nextOrders = res.data || [];
         const previousStatusMap = previousStatusRef.current || {};
@@ -156,7 +156,7 @@ function Orders() {
         ...prev,
         [orderId]: { ...prev[orderId], saving: true }
       }));
-      await axios.post(`http://localhost:5000/api/orders/${orderId}/review`, {
+      await axios.post(`/api/orders/${orderId}/review`, {
         userId,
         rating: ratingValue
       });

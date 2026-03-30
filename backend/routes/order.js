@@ -5,11 +5,13 @@ const { generateUniqueOrderCode } = require('../utils/orderCode');
 
 const WORKING_HOURS = {
     startMinutes: 8 * 60, // 8:00 AM
-    endMinutes: 17 * 60 // 5:00 PM
+    endMinutes: 20 * 60 // 8:00 PM
 };
 
-const WORKING_HOURS_LABEL = '8:00 AM - 5:00 PM';
+const WORKING_HOURS_LABEL = '8:00 AM - 8:00 PM';
 const MAX_ORDER_TOTAL_QUANTITY = 8;
+const DEMO_PAYMENT_TTL_MS = 15 * 60 * 1000;
+const demoPaymentSessions = new Map();
 
 const isWithinWorkingHours = () => {
     const now = new Date();
@@ -35,6 +37,64 @@ const computePickupIso = (minutes = 15) => {
     return eta.toISOString();
 };
 
+const sanitizeItems = (items = []) => {
+    let longestPrep = 0;
+    const normalizedItems = Array.isArray(items) ? items.map(item => {
+        const prepMinutes = parsePrepMinutes(item && item.preparationTime);
+        longestPrep = Math.max(longestPrep, prepMinutes);
+        const rawQuantity = Number(item && item.quantity);
+        const quantity = rawQuantity > 0 ? Math.floor(rawQuantity) : 1;
+        return {
+            name: item && item.name,
+            price: Number(item && item.price) || 0,
+            quantity,
+            preparationTime: item && item.preparationTime,
+            status: 'Pending'
+        };
+    }) : [];
+
+    const totalAmount = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const totalQuantity = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
+
+    return { normalizedItems, totalAmount, totalQuantity, longestPrep };
+};
+
+const cleanupExpiredPaymentSessions = () => {
+    const now = Date.now();
+    for (const [sessionId, session] of demoPaymentSessions.entries()) {
+        if (session.expiresAt <= now && session.status !== 'ordered') {
+            demoPaymentSessions.delete(sessionId);
+        }
+    }
+};
+
+const placeOrderFromPayload = async ({ userId, items, pickupTime, status, paymentMode = 'Cash' }) => {
+    const { normalizedItems, totalAmount, totalQuantity, longestPrep } = sanitizeItems(items);
+
+    if (totalQuantity > MAX_ORDER_TOTAL_QUANTITY) {
+        const err = new Error(`Order limit is ${MAX_ORDER_TOTAL_QUANTITY} total items.`);
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const orderData = {
+        orderCode: await generateUniqueOrderCode(Order),
+        userId,
+        items: normalizedItems,
+        totalAmount,
+        paymentMode,
+        pickupTime: pickupTime || computePickupIso(longestPrep || 15)
+    };
+
+    if (status) {
+        orderData.status = status;
+    }
+
+    const order = new Order(orderData);
+    await order.save();
+    return order;
+};
+
 // Place order (requires logged in user)
 router.post('/place', async (req, res) => {
     const { userId, items = [], pickupTime, status } = req.body;
@@ -49,49 +109,136 @@ router.post('/place', async (req, res) => {
     }
 
     try {
-        let longestPrep = 0;
-        const normalizedItems = Array.isArray(items) ? items.map(item => {
-            const prepMinutes = parsePrepMinutes(item && item.preparationTime);
-            longestPrep = Math.max(longestPrep, prepMinutes);
-            const rawQuantity = Number(item && item.quantity);
-            const quantity = rawQuantity > 0 ? Math.floor(rawQuantity) : 1;
-            return {
-                name: item && item.name,
-                price: Number(item && item.price) || 0,
-                quantity,
-                preparationTime: item && item.preparationTime,
-                status: 'Pending'
-            };
-        }) : [];
-
-        const totalAmount = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const totalQuantity = normalizedItems.reduce((sum, item) => sum + item.quantity, 0);
-
-        if (totalQuantity > MAX_ORDER_TOTAL_QUANTITY) {
-            return res.status(400).json({
-                msg: `Order limit is ${MAX_ORDER_TOTAL_QUANTITY} total items.`
-            });
-        }
-
-        const orderData = {
-            orderCode: await generateUniqueOrderCode(Order),
-            userId,
-            items: normalizedItems,
-            totalAmount,
-            paymentMode,
-            pickupTime: pickupTime || computePickupIso(longestPrep || 15)
-        };
-
-        if (status) {
-            orderData.status = status;
-        }
-
-        const order = new Order(orderData);
-        await order.save();
+        const order = await placeOrderFromPayload({ userId, items, pickupTime, status, paymentMode });
         res.json({ msg: 'Order placed', orderCode: order.orderCode, orderId: order._id });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ msg: err.message });
+        }
         console.error(err);
         res.status(500).json({ msg: 'Unable to place order right now.' });
+    }
+});
+
+router.post('/payment-session/create', async (req, res) => {
+    cleanupExpiredPaymentSessions();
+
+    const { userId, items = [], pickupTime, status } = req.body || {};
+
+    if (!userId) {
+        return res.status(401).json({ msg: 'Login required to start payment.' });
+    }
+
+    if (!isWithinWorkingHours()) {
+        return res.status(403).json({ msg: `Orders can only be placed between ${WORKING_HOURS_LABEL} (college hours).` });
+    }
+
+    try {
+        const { normalizedItems, totalAmount, totalQuantity } = sanitizeItems(items);
+        if (!normalizedItems.length) {
+            return res.status(400).json({ msg: 'Add at least one item to place an order.' });
+        }
+        if (totalQuantity > MAX_ORDER_TOTAL_QUANTITY) {
+            return res.status(400).json({ msg: `Order limit is ${MAX_ORDER_TOTAL_QUANTITY} total items.` });
+        }
+
+        const sessionId = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        demoPaymentSessions.set(sessionId, {
+            sessionId,
+            userId,
+            items: normalizedItems,
+            pickupTime,
+            status,
+            totalAmount,
+            state: 'pending',
+            createdAt: Date.now(),
+            expiresAt: Date.now() + DEMO_PAYMENT_TTL_MS,
+            orderId: null,
+            orderCode: null
+        });
+
+        return res.json({
+            sessionId,
+            state: 'pending',
+            totalAmount,
+            expiresInMs: DEMO_PAYMENT_TTL_MS
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ msg: 'Unable to start demo payment.' });
+    }
+});
+
+router.get('/payment-session/:sessionId', (req, res) => {
+    cleanupExpiredPaymentSessions();
+    const { sessionId } = req.params;
+    const session = demoPaymentSessions.get(sessionId);
+
+    if (!session) {
+        return res.status(404).json({ msg: 'Payment session not found or expired.' });
+    }
+
+    return res.json({
+        sessionId,
+        state: session.state,
+        totalAmount: session.totalAmount,
+        orderId: session.orderId,
+        orderCode: session.orderCode,
+        expiresAt: session.expiresAt
+    });
+});
+
+router.post('/payment-session/:sessionId/pay', async (req, res) => {
+    cleanupExpiredPaymentSessions();
+    const { sessionId } = req.params;
+    const session = demoPaymentSessions.get(sessionId);
+
+    if (!session) {
+        return res.status(404).json({ msg: 'Payment session not found or expired.' });
+    }
+
+    if (session.state === 'ordered') {
+        return res.json({
+            msg: 'Payment already completed.',
+            sessionId,
+            state: 'ordered',
+            orderId: session.orderId,
+            orderCode: session.orderCode
+        });
+    }
+
+    if (!isWithinWorkingHours()) {
+        return res.status(403).json({ msg: `Orders can only be placed between ${WORKING_HOURS_LABEL} (college hours).` });
+    }
+
+    try {
+        session.state = 'processing';
+        const order = await placeOrderFromPayload({
+            userId: session.userId,
+            items: session.items,
+            pickupTime: session.pickupTime,
+            status: session.status,
+            paymentMode: 'Demo Online'
+        });
+
+        session.state = 'ordered';
+        session.orderId = order._id;
+        session.orderCode = order.orderCode;
+
+        return res.json({
+            msg: 'Demo payment successful and order placed.',
+            sessionId,
+            state: session.state,
+            orderId: session.orderId,
+            orderCode: session.orderCode
+        });
+    } catch (err) {
+        session.state = 'pending';
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ msg: err.message });
+        }
+        console.error(err);
+        return res.status(500).json({ msg: 'Unable to complete demo payment.' });
     }
 });
 

@@ -5,7 +5,7 @@ const OrderSchema = new mongoose.Schema({
     userId: String,
     items: Array,
     totalAmount: Number,
-    paymentMode: { type: String, enum: ['Cash'], default: 'Cash' },
+    paymentMode: { type: String, enum: ['Cash', 'Demo Online'], default: 'Cash' },
     pickupTime: String,
     status: { type: String, default: "Pending" },
     pickedAt: Date,
