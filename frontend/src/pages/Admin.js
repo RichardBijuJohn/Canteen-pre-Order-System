@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatOrderDisplayId } from '../utils/orderDisplayId';
 
@@ -39,6 +39,8 @@ const adminStatusTone = (status = '') => {
 
 function Admin() {
   const navigate = useNavigate();
+  const addFormRef = useRef(null);
+  const addItemNameRef = useRef(null);
   const [token, setToken] = useState(localStorage.getItem('adminToken') || '');
   const [adminName, setAdminName] = useState(localStorage.getItem('adminName') || 'Admin');
   const [banner, setBanner] = useState({ type: '', message: '' });
@@ -152,9 +154,10 @@ function Admin() {
       .filter((order) => {
         if (!query) return true;
         const shortId = formatOrderDisplayId(order.orderCode || order._id).toLowerCase();
+        const userName = String(order.userName || '').toLowerCase();
         const user = String(order.userId || '').toLowerCase();
         const status = String(order.status || '').toLowerCase();
-        return shortId.includes(query) || user.includes(query) || status.includes(query);
+        return shortId.includes(query) || userName.includes(query) || user.includes(query) || status.includes(query);
       })
       .sort((a, b) => {
         const aMs = new Date(a.pickupTime).getTime();
@@ -249,6 +252,19 @@ function Admin() {
     }
   };
 
+  const prepareAddFormForCategory = (category) => {
+    if (!category || category === 'All') return;
+    setMenuForm((prev) => ({ ...prev, category }));
+
+    if (addFormRef.current) {
+      addFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    setTimeout(() => {
+      addItemNameRef.current?.focus();
+    }, 120);
+  };
+
   if (!token) {
     return (
       <section className="page-section admin-shell">
@@ -315,15 +331,18 @@ function Admin() {
       </section>
 
       <div className="admin-grid admin-grid-redesign">
-        <section className="admin-card">
+        <section className="admin-card" ref={addFormRef}>
           <div className="admin-card-head">
             <h3>Add Menu Item</h3>
             <p>Create new dishes quickly for the live menu.</p>
+            {menuForm.category && (
+              <p className="admin-form-context">Adding into category: {menuForm.category}</p>
+            )}
           </div>
           <form className="admin-form" onSubmit={addMenuItem}>
-            <input className="input-field" placeholder="Name" value={menuForm.name} onChange={(e) => setMenuForm((prev) => ({ ...prev, name: e.target.value }))} required />
+            <input ref={addItemNameRef} className="input-field" placeholder="Name" value={menuForm.name} onChange={(e) => setMenuForm((prev) => ({ ...prev, name: e.target.value }))} required />
             <input className="input-field" placeholder="Price" type="number" min="1" value={menuForm.price} onChange={(e) => setMenuForm((prev) => ({ ...prev, price: e.target.value }))} required />
-            <input className="input-field" placeholder="Category" value={menuForm.category} onChange={(e) => setMenuForm((prev) => ({ ...prev, category: e.target.value }))} />
+            <input className="input-field" placeholder="Category" value={menuForm.category} onChange={(e) => setMenuForm((prev) => ({ ...prev, category: e.target.value }))} required />
             <input className="input-field" placeholder="Preparation Time" value={menuForm.preparationTime} onChange={(e) => setMenuForm((prev) => ({ ...prev, preparationTime: e.target.value }))} />
             <input className="input-field" placeholder="Rating" type="number" min="1" max="5" step="0.1" value={menuForm.rating} onChange={(e) => setMenuForm((prev) => ({ ...prev, rating: e.target.value }))} />
             <label className="admin-checkbox">
@@ -358,12 +377,24 @@ function Admin() {
                   onClick={() => {
                     setMenuCategory(category);
                     setMenuVisibleCount(6);
+                    if (category !== 'All') {
+                      setMenuForm((prev) => ({ ...prev, category }));
+                    }
                   }}
                 >
                   {category}
                 </button>
               ))}
             </div>
+            {menuCategory !== 'All' && (
+              <button
+                className="ghost-btn"
+                type="button"
+                onClick={() => prepareAddFormForCategory(menuCategory)}
+              >
+                Add item directly to {menuCategory}
+              </button>
+            )}
           </div>
           <div className="admin-list">
             {visibleMenuItems.map((item) => {
@@ -478,7 +509,7 @@ function Admin() {
                 <div className="order-admin-head">
                   <div>
                     <p className="order-id">Order #{formatOrderDisplayId(order.orderCode || order._id)}</p>
-                    <p className="order-time-hint">User: {order.userId}</p>
+                    <p className="order-time-hint">User: {order.userName || order.userId || 'Unknown user'}</p>
                     {itemPreview && <p className="admin-order-preview">Items: {itemPreview}</p>}
                   </div>
                   <div className="admin-status-controls">

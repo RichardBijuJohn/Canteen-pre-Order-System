@@ -152,11 +152,14 @@ router.post('/menu', requireAdmin, async (req, res) => {
     if (!name || Number(price) <= 0) {
       return res.status(400).json({ msg: 'Valid name and price are required.' });
     }
+    if (!String(category || '').trim()) {
+      return res.status(400).json({ msg: 'Category is required.' });
+    }
 
     const item = new MenuItem({
       name: String(name).trim(),
       price: Number(price),
-      category: category ? String(category).trim() : 'General',
+      category: String(category).trim(),
       available: Boolean(available),
       rating: Number(rating) || 4,
       preparationTime: String(preparationTime).trim() || '15 min'
@@ -264,7 +267,42 @@ router.get('/orders', requireAdmin, async (_req, res) => {
       }
     }));
 
-    return res.json(orders);
+    const normalizeUserKey = (value) => String(value || '').trim();
+
+    const rawUserKeys = Array.from(new Set(
+      orders
+        .map((order) => normalizeUserKey(order.userId))
+        .filter(Boolean)
+    ));
+
+    const objectIdLikeKeys = rawUserKeys.filter((key) => /^[a-fA-F0-9]{24}$/.test(key));
+    const emailLikeKeys = rawUserKeys.filter((key) => key.includes('@'));
+
+    const usersById = objectIdLikeKeys.length
+      ? await User.find({ _id: { $in: objectIdLikeKeys } }, { name: 1, email: 1 })
+      : [];
+    const usersByEmail = emailLikeKeys.length
+      ? await User.find({ email: { $in: emailLikeKeys } }, { name: 1, email: 1 })
+      : [];
+
+    const userByKey = new Map();
+    [...usersById, ...usersByEmail].forEach((user) => {
+      userByKey.set(normalizeUserKey(user._id), user);
+      userByKey.set(normalizeUserKey(user.email), user);
+    });
+
+    const enrichedOrders = orders.map((order) => {
+      const base = typeof order.toObject === 'function' ? order.toObject() : order;
+      const normalizedUserId = normalizeUserKey(order.userId);
+      const userInfo = userByKey.get(normalizedUserId);
+      return {
+        ...base,
+        userName: userInfo?.name || base.userNameSnapshot || '',
+        userEmail: userInfo?.email || base.userEmailSnapshot || ''
+      };
+    });
+
+    return res.json(enrichedOrders);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ msg: 'Unable to fetch orders.' });
