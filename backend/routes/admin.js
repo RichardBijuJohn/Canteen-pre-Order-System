@@ -12,6 +12,12 @@ const FALLBACK_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@canteen.local';
 const FALLBACK_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const ALLOWED_STATUS = ['Pending', 'Ready for Pickup', 'Picked', 'Cancelled', 'Complete'];
 
+const hasPickupTimeReached = (pickupTime) => {
+  const pickupMs = new Date(pickupTime).getTime();
+  if (Number.isNaN(pickupMs)) return false;
+  return pickupMs <= Date.now();
+};
+
 const signAdminToken = (payload) => jwt.sign(payload, JWT_SECRET, { expiresIn: '10h' });
 
 const ensureFallbackAdminUser = async () => {
@@ -208,6 +214,38 @@ router.delete('/menu/:itemId', requireAdmin, async (req, res) => {
 router.get('/orders', requireAdmin, async (_req, res) => {
   try {
     const orders = await Order.find().sort({ _id: -1 });
+
+    await Promise.all(orders.map(async (order) => {
+      const statusKey = String(order.status || '').toLowerCase();
+      const isPicked = statusKey.includes('picked');
+      const isCancelled = statusKey.includes('cancel');
+
+      if (isPicked || isCancelled) {
+        return;
+      }
+
+      const reached = hasPickupTimeReached(order.pickupTime);
+
+      if (reached && statusKey.includes('pending')) {
+        order.status = 'Ready for Pickup';
+        order.items = (order.items || []).map((item) => {
+          const base = typeof item.toObject === 'function' ? item.toObject() : item;
+          return { ...base, status: 'Done' };
+        });
+        await order.save();
+        return;
+      }
+
+      if (!reached && statusKey.includes('ready')) {
+        order.status = 'Pending';
+        order.items = (order.items || []).map((item) => {
+          const base = typeof item.toObject === 'function' ? item.toObject() : item;
+          return { ...base, status: 'Pending' };
+        });
+        await order.save();
+      }
+    }));
+
     return res.json(orders);
   } catch (err) {
     console.error(err);
@@ -230,8 +268,23 @@ router.patch('/orders/:orderId/status', requireAdmin, async (req, res) => {
     }
 
     const currentStatusKey = String(order.status || '').toLowerCase();
+    const pickupReached = hasPickupTimeReached(order.pickupTime);
     if (currentStatusKey.includes('picked') && nextStatus === 'Ready for Pickup') {
       return res.status(400).json({ msg: 'Picked orders cannot be set back to Ready for Pickup.' });
+    }
+
+    if (nextStatus === 'Ready for Pickup' && !pickupReached) {
+      return res.status(400).json({ msg: 'Order can be marked Ready for Pickup only when pickup time is reached.' });
+    }
+
+    if (nextStatus === 'Picked') {
+      const isReadyNow = currentStatusKey.includes('ready');
+      if (!pickupReached) {
+        return res.status(400).json({ msg: 'Order can be marked Picked only after pickup time is reached.' });
+      }
+      if (!isReadyNow && !currentStatusKey.includes('picked')) {
+        return res.status(400).json({ msg: 'Mark order as Ready for Pickup before setting it to Picked.' });
+      }
     }
 
     order.status = nextStatus;
