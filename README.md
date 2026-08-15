@@ -1,4 +1,31 @@
-# Getting Started with Create React App
+# Canteen Pre-Order System
+
+The app now deploys as a single server from the project root. The backend serves the React production build from `frontend/build`, so you only need one deployed service.
+
+## Local development
+
+Run the backend and frontend separately in two terminals while developing:
+
+```bash
+npm install --prefix backend
+npm install --prefix frontend
+npm start --prefix backend
+npm start --prefix frontend
+```
+
+## Production deployment
+
+From the project root:
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+Set `MONGODB_URI` and `PORT` in your host environment if needed.
+
+## Create React App notes
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
